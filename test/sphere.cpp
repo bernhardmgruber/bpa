@@ -32,6 +32,6 @@ namespace {
 TEST(sphere, reconstruct) {
 	const auto cloud = createSphericalCloud(36, 18);
 	savePoints("cloud.ply", cloud);
-	const auto mesh = bpa::reconstruct(cloud);
+	const auto mesh = bpa::reconstruct(cloud, 0.1f);
 	saveTriangles("mesh.stl", mesh);
 }
