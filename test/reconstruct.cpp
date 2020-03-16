@@ -29,9 +29,37 @@ namespace {
 	}
 }
 
-TEST(sphere, reconstruct) {
+TEST(reconstruct, sphere) {
 	const auto cloud = createSphericalCloud(36, 18);
-	savePoints("cloud.ply", cloud);
-	const auto mesh = bpa::reconstruct(cloud, 0.1f);
-	saveTriangles("mesh.stl", mesh);
+	savePoints("sphere_cloud.ply", cloud);
+	const auto mesh = bpa::reconstruct(cloud, 0.3f);
+	saveTriangles("sphere_mesh.stl", mesh);
+}
+
+TEST(reconstruct, tetrahedron) {
+	const auto cloud = std::vector<glm::vec3>{
+		{0, 0, 0},
+		{0, 1, 0},
+		{1, 0, 0},
+		{0, 0, 1},
+	};
+	savePoints("tetrahedron_cloud.ply", cloud);
+	const auto mesh = bpa::reconstruct(cloud, 2);
+	saveTriangles("tetrahedron_mesh.stl", mesh);
+}
+
+TEST(reconstruct, cube) {
+	const auto cloud = std::vector<glm::vec3>{
+		{0, 0, 0},
+		{0, 1, 0},
+		{1, 1, 0},
+		{1, 0, 0},
+		{0, 0, 1},
+		{0, 1, 1},
+		{1, 1, 1},
+		{1, 0, 1},
+	};
+	savePoints("cube_cloud.ply", cloud);
+	const auto mesh = bpa::reconstruct(cloud, 2);
+	saveTriangles("cube_mesh.stl", mesh);
 }

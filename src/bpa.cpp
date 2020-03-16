@@ -1,14 +1,24 @@
 #include "bpa.h"
 
+#include <boost/math/constants/constants.hpp>
 #include <algorithm>
 #include <deque>
 #include <optional>
+#include <string>
+#include <iostream>
+
+#include <glm/gtx/io.hpp>
+
+#include "IO.h"
 
 using glm::vec3;
 using glm::ivec3;
 
 namespace bpa {
 	namespace {
+		constexpr auto debug = false;
+		constexpr auto pi = boost::math::constants::pi<float>();
+
 		struct Point {
 			vec3 pos;
 			bool used = false;
@@ -40,6 +50,7 @@ namespace bpa {
 
 				const auto sizes = upper - lower;
 				dims = ivec3{glm::ceil(sizes / cellSize)};
+				dims = glm::max(dims, ivec3{1}); // for planar clouds
 				cells.resize(dims.x * dims.y * dims.z);
 			}
 
@@ -70,9 +81,11 @@ namespace bpa {
 				return result;
 			}
 
-			auto sphericalNeighborhood(vec3 point) -> std::vector<Point*> {
+			auto sphericalNeighborhood(vec3 point, std::initializer_list<vec3> ignore) -> std::vector<Point*> {
 				auto result = neighborhood27(point);
-				result.erase(std::remove_if(begin(result), end(result), [&](Point* p) { return glm::length(p->pos - point) > cellSize || p->pos == point; }), end(result));
+				result.erase(std::remove_if(begin(result), end(result), [&](Point* p) {
+					return glm::length(p->pos - point) > cellSize || std::find(begin(ignore), end(ignore), p->pos) != end(ignore);
+				}), end(result));
 				return result;
 			}
 
@@ -100,15 +113,7 @@ namespace bpa {
 			return g;
 		}
 
-		auto neighborhoodByDistance(vec3 point, Grid& grid) {
-			auto points = grid.sphericalNeighborhood(point);
-			std::sort(begin(points), end(points), [&](Point* a, Point* b) {
-				return glm::length(a->pos - point) < glm::length(b->pos - point);
-			});
-			return points;
-		}
-
-		auto computeBallCenter(Face f, float radius) {
+		auto computeBallCenter(Face f, float radius) -> std::optional<vec3> {
 			// from https://gamedev.stackexchange.com/questions/60630/how-do-i-find-the-circumcenter-of-a-triangle-in-3d
 			const vec3 ac = f[2]->pos - f[0]->pos;
 			const vec3 ab = f[1]->pos - f[0]->pos;
@@ -116,13 +121,16 @@ namespace bpa {
 			const vec3 toCircumCircleCenter = (glm::cross(abXac, ab) * glm::dot(ac, ac) + glm::cross(ac, abXac) * glm::dot(ab, ab)) / (2 * glm::dot(abXac, abXac));
 			const vec3 circumCircleCenter = f[0]->pos + toCircumCircleCenter;
 
-			auto ballCenter = circumCircleCenter + f.normal() * std::sqrt(radius * radius - glm::dot(toCircumCircleCenter, toCircumCircleCenter));
+			const auto heightSquared = radius * radius - glm::dot(toCircumCircleCenter, toCircumCircleCenter);
+			if (heightSquared < 0)
+				return {};
+			auto ballCenter = circumCircleCenter + f.normal() * std::sqrt(heightSquared);
 			return ballCenter;
 		}
 
 		auto ballIsEmpty(vec3 ballCenter, const std::vector<Point*>& points, float radius) -> bool {
 			return std::all_of(begin(points), end(points), [&](Point* p) {
-				return glm::dot(p->pos - ballCenter, p->pos - ballCenter) > radius * radius;
+				return glm::dot(p->pos - ballCenter, p->pos - ballCenter) > radius * radius - 1e-4f; // TODO epsilon
 			});
 		}
 
@@ -134,17 +142,21 @@ namespace bpa {
 		auto findSeedTriangle(Grid& grid, float radius) -> std::optional<SeedResult> {
 			for (auto& cell : grid.cells) {
 				for (auto& p1 : cell.points) {
-					const auto neighborhood = neighborhoodByDistance(p1.pos, grid);
+					auto neighborhood = grid.sphericalNeighborhood(p1.pos, {p1.pos});
+					std::sort(begin(neighborhood), end(neighborhood), [&](Point* a, Point* b) {
+						return glm::length(a->pos - p1.pos) < glm::length(b->pos - p1.pos);
+					});
+
 					for (auto& p2 : neighborhood) {
 						for (auto& p3 : neighborhood) {
 							if (p2 == p3) continue;
 							Face f{{&p1, p2, p3}};
 							const auto ballCenter = computeBallCenter(f, radius);
-							if (ballIsEmpty(ballCenter, neighborhood, radius)) {
+							if (ballCenter && ballIsEmpty(ballCenter.value(), neighborhood, radius)) {
 								p1.used = true;
 								p2->used = true;
 								p3->used = true;
-								return SeedResult{f, ballCenter};
+								return SeedResult{f, ballCenter.value()};
 							}
 						}
 					}
@@ -168,34 +180,71 @@ namespace bpa {
 		auto ballPivot(const Edge* e, Grid& grid, float radius) -> std::optional<PivotResult> {
 			const auto m = (e->a->pos + e->b->pos) / 2.0f;
 			const auto oldCenterVec = glm::normalize(e->center - m);
-			auto n = grid.sphericalNeighborhood(m);
+			auto neighborhood = grid.sphericalNeighborhood(m, {e->a->pos, e->b->pos, e->opposite->pos});
+
+			static auto counter = 0;
+			counter++;
+			if (debug) {
+				saveTriangles(std::to_string(counter) + "_pivot_edge.stl", std::vector<Triangle>{Triangle{e->a->pos, e->a->pos, e->b->pos}});
+
+				std::vector<vec3> points(neighborhood.size());
+				std::transform(begin(neighborhood), end(neighborhood), begin(points), [](const Point* p) { return p->pos; });
+				savePoints(std::to_string(counter) + "_neighborhood.ply", points);
+
+				if (debug) std::cout << "pivoting " << counter << "\n";
+			}
 
 			auto smallestAngle = std::numeric_limits<float>::max();
 			Point* pointWithSmallestAngle = nullptr;
 			vec3 centerOfSmallest{};
-			for (const auto& p : n) {
-				const auto c = computeBallCenter(Face{{e->a, e->b, p}}, radius);
-				const auto newCenterVec = glm::normalize(c - m);
-				const auto angle = std::acos(glm::dot(oldCenterVec, newCenterVec));
-				if (angle < smallestAngle && ballIsEmpty(c, n, radius)) {
+			std::cout << "pivoting edge a=" << e->a->pos << " b=" << e->b->pos << " op=" << e->opposite->pos << ". testing " << neighborhood.size() << " neighbors\n";
+			for (const auto& p : neighborhood) {
+				auto newFaceNormal = Triangle{e->b->pos, e->a->pos, p->pos}.normal();
+
+				const auto c = computeBallCenter(Face{{e->b, e->a, p}}, radius);
+				if (!c) {
+					std::cout << "    " << p->pos << " center computation failed\n";
+					continue;
+				}
+
+				if (debug) {
+					static auto counter2 = 0;
+					counter2++;
+					saveTriangles(std::to_string(counter) + "_" + std::to_string(counter2) + "_face.stl", std::vector<Triangle>{Triangle{e->a->pos, e->b->pos, p->pos}});
+					savePoints(std::to_string(counter) + "_" + std::to_string(counter2) + "_ballcenter.ply", {c.value()});
+				}
+
+				// this check is not in the paper: the ball center must always be above the triangle
+				const auto newCenterVec = glm::normalize(c.value() - m);
+				if (glm::dot(newCenterVec, newFaceNormal) < 0) {
+					std::cout << "    " << p->pos << " ball center " << c.value() << " underneath triangle\n";
+					continue;
+				}
+
+				auto angle = std::acos(std::clamp(glm::dot(oldCenterVec, newCenterVec), -1.0f, 1.0f));
+				if (glm::dot(glm::cross(newCenterVec, oldCenterVec), e->b->pos - e->a->pos) < 0)
+					angle += pi;
+				std::cout << "    " << p->pos << " center " << c.value() << " angle " << angle << "\n";
+
+				if (angle < smallestAngle && ballIsEmpty(c.value(), neighborhood, radius)) {
 					smallestAngle = angle;
 					pointWithSmallestAngle = p;
-					centerOfSmallest = c;
+					centerOfSmallest = c.value();
 				}
 			}
 
 			if (smallestAngle != std::numeric_limits<float>::max()) {
-				pointWithSmallestAngle->used = true;
+				if (debug) savePoints(std::to_string(counter) + "_candidate.ply", {pointWithSmallestAngle->pos});
 				return PivotResult{pointWithSmallestAngle, centerOfSmallest};
 			}
 			return {};
 		}
 
-		auto notUsed(Point* p) {
+		auto notUsed(const Point* p) -> bool {
 			return !p->used;
 		}
 
-		auto onFront(Point* p, std::deque<Edge>& front) -> bool {
+		auto onFront(const Point* p, const std::deque<Edge>& front) -> bool {
 			return std::any_of(begin(front), end(front), [&](const Edge& e) {
 				return p == e.a || p == e.b;
 			});
@@ -207,8 +256,7 @@ namespace bpa {
 			});
 			assert(it != end(front));
 			// we cannot erase because this moves all the Edges in memory, so we mark it
-			it->a = nullptr;
-			it->b = nullptr;
+			*it = Edge{};
 		}
 
 		void outputTriangle(Face f, std::vector<Triangle>& triangles) {
@@ -220,11 +268,17 @@ namespace bpa {
 
 			auto& e_ik = front.emplace_back(Edge{e_ij->a, o_k, e_ij->b, o_k_ballCenter});
 			auto& e_kj = front.emplace_back(Edge{o_k, e_ij->b, e_ij->a, o_k_ballCenter});
+
 			e_ik.next = &e_kj;
-			e_kj.prev = &e_ik;
+			e_ik.prev = e_ij->prev;
 			e_ij->prev->next = &e_ik;
+
+			e_kj.prev = &e_ik;
+			e_kj.next = e_ij->next;
 			e_ij->next->prev = &e_kj;
+
 			remove(e_ij, front);
+
 			return {&e_ik, &e_kj};
 		}
 
@@ -250,8 +304,16 @@ namespace bpa {
 				remove(b, front);
 				return;
 			}
-			//// case 3
-			//if (a->prev != b && 
+			// case 3
+			a->prev->next = b->next;
+			b->next->prev = a->prev;
+			a->next->prev = b->prev;
+			b->prev->next = a->next;
+			remove(a, front);
+			remove(b, front);
+
+			std::cerr << "unsuccessful glue\n";
+			assert(false);
 		}
 	}
 
@@ -259,8 +321,10 @@ namespace bpa {
 		auto grid = buildGrid(points, radius);
 
 		const auto seedResult = findSeedTriangle(grid, radius);
-		if (!seedResult)
+		if (!seedResult) {
+			std::cerr << "No seed triangle found\n";
 			return {};
+		}
 
 		std::vector<Triangle> triangles;
 		std::deque<Edge> front;
@@ -279,12 +343,23 @@ namespace bpa {
 
 		while (auto e_ij = getActiveEdge(front)) {
 			if (const auto o_k = ballPivot(e_ij.value(), grid, radius); o_k && (notUsed(o_k->p) || onFront(o_k->p, front))) {
+				o_k->p->used = true;
 				outputTriangle({{e_ij.value()->a, o_k->p, e_ij.value()->b}}, triangles);
 				auto [e_ik, e_kj] = join(e_ij.value(), o_k->p, o_k->center, front, triangles);
 				if (auto e_ki = std::find_if(begin(front), end(front), [&](const Edge& e) { return e_ik->a == e.b && e_ik->b == e.a; }); e_ki != end(front)) glue(e_ik, &*e_ki, front);
 				if (auto e_jk = std::find_if(begin(front), end(front), [&](const Edge& e) { return e_kj->a == e.b && e_kj->b == e.a; }); e_jk != end(front)) glue(e_kj, &*e_jk, front);
 			} else
 				e_ij.value()->active = false;
+		}
+
+		if (debug) {
+			std::vector<Triangle> boundaryEdges;
+			for (const auto& e : front) {
+				if (e.a != nullptr)
+					boundaryEdges.push_back({e.a->pos, e.a->pos, e.b->pos});
+			}
+			saveTriangles("boundaryEdges.stl", boundaryEdges);
+
 		}
 
 		return triangles;
