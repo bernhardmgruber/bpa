@@ -175,10 +175,13 @@ namespace bpa {
 			return {};
 		}
 
-		auto getActiveEdge(std::deque<Edge>& front) -> std::optional<Edge*> {
-			for (auto& e : front)
-				if (e.a && e.b && e.status == EdgeStatus::active)
-					return &e;
+		auto getActiveEdge(std::vector<Edge*>& front) -> std::optional<Edge*> {
+			while (!front.empty()) {
+				auto* e = front.back();
+				if (e->status == EdgeStatus::active)
+					return e;
+				front.pop_back(); // cleanup non-active edges from front
+			}
 			return {};
 		}
 
@@ -278,7 +281,8 @@ namespace bpa {
 			});
 		}
 
-		void remove(Edge* edge, std::deque<Edge>& front) {
+		void remove(Edge* edge) {
+			// just mark the edge as inner. The edge will be removed later in getActiveEdge()
 			edge->status = EdgeStatus::inner;
 		}
 
@@ -286,9 +290,9 @@ namespace bpa {
 			triangles.push_back({f[0]->pos, f[1]->pos, f[2]->pos});
 		}
 
-		auto join(Edge* e_ij, Point* o_k, vec3 o_k_ballCenter, std::deque<Edge>& front) -> std::tuple<Edge*, Edge*> {
-			auto& e_ik = front.emplace_back(Edge{e_ij->a, o_k, e_ij->b, o_k_ballCenter});
-			auto& e_kj = front.emplace_back(Edge{o_k, e_ij->b, e_ij->a, o_k_ballCenter});
+		auto join(Edge* e_ij, Point* o_k, vec3 o_k_ballCenter, std::vector<Edge*>& front, std::deque<Edge>& edges) -> std::tuple<Edge*, Edge*> {
+			auto& e_ik = edges.emplace_back(Edge{e_ij->a, o_k, e_ij->b, o_k_ballCenter});
+			auto& e_kj = edges.emplace_back(Edge{o_k, e_ij->b, e_ij->a, o_k_ballCenter});
 
 			e_ik.next = &e_kj;
 			e_ik.prev = e_ij->prev;
@@ -304,39 +308,42 @@ namespace bpa {
 			o_k->edges.push_back(&e_ik);
 			o_k->edges.push_back(&e_kj);
 
-			remove(e_ij, front);
+			front.push_back(&e_ik);
+			front.push_back(&e_kj);
+			remove(e_ij);
 
 			return {&e_ik, &e_kj};
 		}
 
-		void glue(Edge* a, Edge* b, std::deque<Edge>& front) {
-			std::vector<Triangle> frontTriangles;
-			for (const auto& e : front)
-				if (e.status == EdgeStatus::active)
-					frontTriangles.push_back(Triangle{e.a->pos, e.a->pos, e.b->pos});
-			if (debug) saveTriangles("glue_front.stl", frontTriangles);
-
-			if (debug) saveTriangles("glue_edges.stl", std::vector<Triangle>{Triangle{a->a->pos, a->a->pos, a->b->pos}, Triangle{b->a->pos, b->a->pos, b->b->pos}});
+		void glue(Edge* a, Edge* b, std::vector<Edge*>& front) {
+			if (debug) {
+				std::vector<Triangle> frontTriangles;
+				for (const auto* e : front)
+					if (e->status == EdgeStatus::active)
+						frontTriangles.push_back(Triangle{e->a->pos, e->a->pos, e->b->pos});
+				saveTriangles("glue_front.stl", frontTriangles);
+				saveTriangles("glue_edges.stl", std::vector<Triangle>{Triangle{a->a->pos, a->a->pos, a->b->pos}, Triangle{b->a->pos, b->a->pos, b->b->pos}});
+			}
 
 			// case 1
 			if (a->next == b && a->prev == b && b->next == a && b->prev == a) {
-				remove(a, front);
-				remove(b, front);
+				remove(a);
+				remove(b);
 				return;
 			}
 			// case 2
 			if (a->next == b && b->prev == a) {
 				a->prev->next = b->next;
 				b->next->prev = a->prev;
-				remove(a, front);
-				remove(b, front);
+				remove(a);
+				remove(b);
 				return;
 			}
 			if (a->prev == b && b->next == a) {
 				a->next->prev = b->prev;
 				b->prev->next = a->next;
-				remove(a, front);
-				remove(b, front);
+				remove(a);
+				remove(b);
 				return;
 			}
 			// case 3/4
@@ -344,8 +351,8 @@ namespace bpa {
 			b->next->prev = a->prev;
 			a->next->prev = b->prev;
 			b->prev->next = a->next;
-			remove(a, front);
-			remove(b, front);
+			remove(a);
+			remove(b);
 		}
 	}
 
@@ -359,19 +366,20 @@ namespace bpa {
 		}
 
 		std::vector<Triangle> triangles;
-		std::deque<Edge> front;
+		std::deque<Edge> edges;
 
 		auto [seed, ballCenter] = *seedResult;
 		outputTriangle(seed, triangles);
-		front.push_back({seed[0], seed[1], seed[2], ballCenter});
-		front.push_back({seed[1], seed[2], seed[0], ballCenter});
-		front.push_back({seed[2], seed[0], seed[1], ballCenter});
-		front[0].prev = &front[2];
-		front[0].next = &front[1];
-		front[1].prev = &front[0];
-		front[1].next = &front[2];
-		front[2].prev = &front[1];
-		front[2].next = &front[0];
+		auto& e0 = edges.emplace_back(Edge{seed[0], seed[1], seed[2], ballCenter});
+		auto& e1 = edges.emplace_back(Edge{seed[1], seed[2], seed[0], ballCenter});
+		auto& e2 = edges.emplace_back(Edge{seed[2], seed[0], seed[1], ballCenter});
+		e0.prev = &e2;
+		e0.next = &e1;
+		e1.prev = &e0;
+		e1.next = &e2;
+		e2.prev = &e1;
+		e2.next = &e0;
+		std::vector<Edge*> front{&e0, &e1, &e2};
 
 		if (debug) saveTriangles("seed.stl", triangles);
 
@@ -382,21 +390,23 @@ namespace bpa {
 			if (debug) saveTriangles("current_mesh.stl", triangles);
 			if (o_k && (notUsed(o_k->p) || onFront(o_k->p))) {
 				outputTriangle({{e_ij.value()->a, o_k->p, e_ij.value()->b}}, triangles);
-				auto [e_ik, e_kj] = join(e_ij.value(), o_k->p, o_k->center, front);
-				if (auto e_ki = std::find_if(begin(front), end(front), [&](const Edge& e) { return e_ik->a == e.b && e_ik->b == e.a; }); e_ki != end(front)) glue(e_ik, &*e_ki, front);
-				if (auto e_jk = std::find_if(begin(front), end(front), [&](const Edge& e) { return e_kj->a == e.b && e_kj->b == e.a; }); e_jk != end(front)) glue(e_kj, &*e_jk, front);
+				auto [e_ik, e_kj] = join(e_ij.value(), o_k->p, o_k->center, front, edges);
+				if (auto e_ki = std::find_if(begin(front), end(front), [&](const Edge* e) { return e_ik->a == e->b && e_ik->b == e->a; }); e_ki != end(front)) glue(e_ik, *e_ki, front);
+				if (auto e_jk = std::find_if(begin(front), end(front), [&](const Edge* e) { return e_kj->a == e->b && e_kj->b == e->a; }); e_jk != end(front)) glue(e_kj, *e_jk, front);
 			} else {
 				if (debug) savePoints("current_boundary_point.ply", {o_k->p->pos});
 				e_ij.value()->status = EdgeStatus::boundary;
 			}
 		}
 
+		if (debug) {
 			std::vector<Triangle> boundaryEdges;
-			for (const auto& e : front) {
-				if (e.status == EdgeStatus::boundary)
-					boundaryEdges.push_back({e.a->pos, e.a->pos, e.b->pos});
+			for (const auto* e : front) {
+				if (e->status == EdgeStatus::boundary)
+					boundaryEdges.push_back({e->a->pos, e->a->pos, e->b->pos});
 			}
-			if (debug) saveTriangles("boundaryEdges.stl", boundaryEdges);
+			saveTriangles("boundaryEdges.stl", boundaryEdges);
+		}
 
 		return triangles;
 	}
