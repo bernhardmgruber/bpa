@@ -36,6 +36,13 @@ TEST(reconstruct, sphere_36_18) {
 	saveTriangles("sphere_36_18_mesh.stl", mesh);
 }
 
+TEST(reconstruct, sphere_100_50) {
+	const auto cloud = createSphericalCloud(100, 50);
+	savePoints("sphere_100_50_cloud.ply", cloud);
+	const auto mesh = bpa::reconstruct(cloud, 0.3f);
+	saveTriangles("sphere_100_50_mesh.stl", mesh);
+}
+
 TEST(reconstruct, sphere_360_180) {
 	const auto cloud = createSphericalCloud(360, 180);
 	savePoints("sphere_360_180_cloud.ply", cloud);
