@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 #include <iostream>
+#include <sstream>
 
 #include <glm/gtx/io.hpp>
 
@@ -19,9 +20,18 @@ namespace bpa {
 		constexpr auto debug = false;
 		constexpr auto pi = boost::math::constants::pi<float>();
 
+		struct Edge;
+
 		struct Point {
 			vec3 pos;
 			bool used = false;
+			std::vector<Edge*> edges;
+		};
+
+		enum class EdgeStatus {
+			active,
+			inner,
+			boundary
 		};
 
 		struct Edge {
@@ -31,7 +41,7 @@ namespace bpa {
 			vec3 center;
 			Edge* prev;
 			Edge* next;
-			bool active = true;
+			EdgeStatus status = EdgeStatus::active;
 		};
 
 		struct Face : std::array<Point*, 3>{
@@ -167,7 +177,7 @@ namespace bpa {
 
 		auto getActiveEdge(std::deque<Edge>& front) -> std::optional<Edge*> {
 			for (auto& e : front)
-				if (e.a && e.b && e.active)
+				if (e.a && e.b && e.status == EdgeStatus::active)
 					return &e;
 			return {};
 		}
@@ -190,20 +200,22 @@ namespace bpa {
 				std::vector<vec3> points(neighborhood.size());
 				std::transform(begin(neighborhood), end(neighborhood), begin(points), [](const Point* p) { return p->pos; });
 				savePoints(std::to_string(counter) + "_neighborhood.ply", points);
-
-				if (debug) std::cout << "pivoting " << counter << "\n";
 			}
 
 			auto smallestAngle = std::numeric_limits<float>::max();
 			Point* pointWithSmallestAngle = nullptr;
 			vec3 centerOfSmallest{};
-			std::cout << "pivoting edge a=" << e->a->pos << " b=" << e->b->pos << " op=" << e->opposite->pos << ". testing " << neighborhood.size() << " neighbors\n";
+			std::stringstream ss;
+			ss << counter << ". pivoting edge a=" << e->a->pos << " b=" << e->b->pos << " op=" << e->opposite->pos << ". testing " << neighborhood.size() << " neighbors\n";
+			auto i = 0;
+			int smallestNumber = 0;
 			for (const auto& p : neighborhood) {
+				i++;
 				auto newFaceNormal = Triangle{e->b->pos, e->a->pos, p->pos}.normal();
 
 				const auto c = computeBallCenter(Face{{e->b, e->a, p}}, radius);
 				if (!c) {
-					std::cout << "    " << p->pos << " center computation failed\n";
+					ss << i << ".    " << p->pos << " center computation failed\n";
 					continue;
 				}
 
@@ -216,27 +228,43 @@ namespace bpa {
 
 				// this check is not in the paper: the ball center must always be above the triangle
 				const auto newCenterVec = glm::normalize(c.value() - m);
-				if (glm::dot(newCenterVec, newFaceNormal) < 0) {
-					std::cout << "    " << p->pos << " ball center " << c.value() << " underneath triangle\n";
+				const auto newCenterFaceDot = glm::dot(newCenterVec, newFaceNormal);
+				if (newCenterFaceDot < 0) {
+					ss << i << ".    " << p->pos << " ball center " << c.value() << " underneath triangle\n";
 					continue;
 				}
 
-				auto angle = std::acos(std::clamp(glm::dot(oldCenterVec, newCenterVec), -1.0f, 1.0f));
-				if (glm::dot(glm::cross(newCenterVec, oldCenterVec), e->b->pos - e->a->pos) < 0)
-					angle += pi;
-				std::cout << "    " << p->pos << " center " << c.value() << " angle " << angle << "\n";
+				// this check is not in the paper: points to which we already have an inner edge are not considered
+				for (const auto* ee : p->edges) {
+					const auto* otherPoint = ee->a == p ? ee->b : ee->a;
+					if (ee->status == EdgeStatus::inner && (otherPoint == e->a || otherPoint == e->b)) {
+						ss << i << ".    " << p->pos << " inner edge exists\n";
+						goto nextneighbor;
+					}
+				}
 
-				if (angle < smallestAngle && ballIsEmpty(c.value(), neighborhood, radius)) {
+				auto angle = std::acos(std::clamp(glm::dot(oldCenterVec, newCenterVec), -1.0f, 1.0f));
+				if (glm::dot(glm::cross(newCenterVec, oldCenterVec), e->a->pos - e->b->pos) < 0)
+					angle += pi;
+				const auto empty = ballIsEmpty(c.value(), neighborhood, radius);
+				ss << i << ".    " << p->pos << " center " << c.value() << " empty " << empty << " angle " << angle << " newCenterFaceDot " << newCenterFaceDot << "\n";
+
+				if (angle < smallestAngle && empty) {
 					smallestAngle = angle;
 					pointWithSmallestAngle = p;
 					centerOfSmallest = c.value();
+					smallestNumber = i;
 				}
+			nextneighbor:;
 			}
 
 			if (smallestAngle != std::numeric_limits<float>::max()) {
+				ss << "        picking point " << smallestNumber << "\n";
 				if (debug) savePoints(std::to_string(counter) + "_candidate.ply", {pointWithSmallestAngle->pos});
 				return PivotResult{pointWithSmallestAngle, centerOfSmallest};
 			}
+			std::cout << ss.str();
+
 			return {};
 		}
 
@@ -244,38 +272,37 @@ namespace bpa {
 			return !p->used;
 		}
 
-		auto onFront(const Point* p, const std::deque<Edge>& front) -> bool {
-			return std::any_of(begin(front), end(front), [&](const Edge& e) {
-				return p == e.a || p == e.b;
+		auto onFront(const Point* p) -> bool {
+			return std::any_of(begin(p->edges), end(p->edges), [&](const Edge* e) {
+				return e->status == EdgeStatus::active;
 			});
 		}
 
 		void remove(Edge* edge, std::deque<Edge>& front) {
-			const auto it = std::find_if(begin(front), end(front), [&](const Edge& e) {
-				return edge == &e;
-			});
-			assert(it != end(front));
-			// we cannot erase because this moves all the Edges in memory, so we mark it
-			*it = Edge{};
+			edge->status = EdgeStatus::inner;
 		}
 
 		void outputTriangle(Face f, std::vector<Triangle>& triangles) {
 			triangles.push_back({f[0]->pos, f[1]->pos, f[2]->pos});
 		}
 
-		auto join(Edge* e_ij, Point* o_k, vec3 o_k_ballCenter, std::deque<Edge>& front, std::vector<Triangle>& triangles) -> std::tuple<Edge*, Edge*> {
-			outputTriangle({e_ij->a, o_k, e_ij->b}, triangles);
-
+		auto join(Edge* e_ij, Point* o_k, vec3 o_k_ballCenter, std::deque<Edge>& front) -> std::tuple<Edge*, Edge*> {
 			auto& e_ik = front.emplace_back(Edge{e_ij->a, o_k, e_ij->b, o_k_ballCenter});
 			auto& e_kj = front.emplace_back(Edge{o_k, e_ij->b, e_ij->a, o_k_ballCenter});
 
 			e_ik.next = &e_kj;
 			e_ik.prev = e_ij->prev;
 			e_ij->prev->next = &e_ik;
+			e_ij->a->edges.push_back(&e_ik);
 
 			e_kj.prev = &e_ik;
 			e_kj.next = e_ij->next;
 			e_ij->next->prev = &e_kj;
+			e_ij->b->edges.push_back(&e_kj);
+
+			o_k->used = true;
+			o_k->edges.push_back(&e_ik);
+			o_k->edges.push_back(&e_kj);
 
 			remove(e_ij, front);
 
@@ -283,6 +310,14 @@ namespace bpa {
 		}
 
 		void glue(Edge* a, Edge* b, std::deque<Edge>& front) {
+			std::vector<Triangle> frontTriangles;
+			for (const auto& e : front)
+				if (e.status == EdgeStatus::active)
+					frontTriangles.push_back(Triangle{e.a->pos, e.a->pos, e.b->pos});
+			if (debug) saveTriangles("glue_front.stl", frontTriangles);
+
+			if (debug) saveTriangles("glue_edges.stl", std::vector<Triangle>{Triangle{a->a->pos, a->a->pos, a->b->pos}, Triangle{b->a->pos, b->a->pos, b->b->pos}});
+
 			// case 1
 			if (a->next == b && a->prev == b && b->next == a && b->prev == a) {
 				remove(a, front);
@@ -304,16 +339,13 @@ namespace bpa {
 				remove(b, front);
 				return;
 			}
-			// case 3
+			// case 3/4
 			a->prev->next = b->next;
 			b->next->prev = a->prev;
 			a->next->prev = b->prev;
 			b->prev->next = a->next;
 			remove(a, front);
 			remove(b, front);
-
-			std::cerr << "unsuccessful glue\n";
-			assert(false);
 		}
 	}
 
@@ -341,26 +373,30 @@ namespace bpa {
 		front[2].prev = &front[1];
 		front[2].next = &front[0];
 
+		if (debug) saveTriangles("seed.stl", triangles);
+
+		auto counter = 0;
 		while (auto e_ij = getActiveEdge(front)) {
-			if (const auto o_k = ballPivot(e_ij.value(), grid, radius); o_k && (notUsed(o_k->p) || onFront(o_k->p, front))) {
-				o_k->p->used = true;
+			if (debug) saveTriangles("current_active_edge.stl", std::vector<Triangle>{Triangle{e_ij.value()->a->pos, e_ij.value()->a->pos, e_ij.value()->b->pos}});
+			const auto o_k = ballPivot(e_ij.value(), grid, radius);
+			if (debug) saveTriangles("current_mesh.stl", triangles);
+			if (o_k && (notUsed(o_k->p) || onFront(o_k->p))) {
 				outputTriangle({{e_ij.value()->a, o_k->p, e_ij.value()->b}}, triangles);
-				auto [e_ik, e_kj] = join(e_ij.value(), o_k->p, o_k->center, front, triangles);
+				auto [e_ik, e_kj] = join(e_ij.value(), o_k->p, o_k->center, front);
 				if (auto e_ki = std::find_if(begin(front), end(front), [&](const Edge& e) { return e_ik->a == e.b && e_ik->b == e.a; }); e_ki != end(front)) glue(e_ik, &*e_ki, front);
 				if (auto e_jk = std::find_if(begin(front), end(front), [&](const Edge& e) { return e_kj->a == e.b && e_kj->b == e.a; }); e_jk != end(front)) glue(e_kj, &*e_jk, front);
-			} else
-				e_ij.value()->active = false;
+			} else {
+				if (debug) savePoints("current_boundary_point.ply", {o_k->p->pos});
+				e_ij.value()->status = EdgeStatus::boundary;
+			}
 		}
 
-		if (debug) {
 			std::vector<Triangle> boundaryEdges;
 			for (const auto& e : front) {
-				if (e.a != nullptr)
+				if (e.status == EdgeStatus::boundary)
 					boundaryEdges.push_back({e.a->pos, e.a->pos, e.b->pos});
 			}
-			saveTriangles("boundaryEdges.stl", boundaryEdges);
-
-		}
+			if (debug) saveTriangles("boundaryEdges.stl", boundaryEdges);
 
 		return triangles;
 	}
