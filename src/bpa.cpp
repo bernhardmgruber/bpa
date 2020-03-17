@@ -206,7 +206,7 @@ namespace bpa {
 			Point* pointWithSmallestAngle = nullptr;
 			vec3 centerOfSmallest{};
 			std::stringstream ss;
-			ss << counter << ". pivoting edge a=" << e->a->pos << " b=" << e->b->pos << " op=" << e->opposite->pos << ". testing " << neighborhood.size() << " neighbors\n";
+			if (debug) ss << counter << ". pivoting edge a=" << e->a->pos << " b=" << e->b->pos << " op=" << e->opposite->pos << ". testing " << neighborhood.size() << " neighbors\n";
 			auto i = 0;
 			int smallestNumber = 0;
 			for (const auto& p : neighborhood) {
@@ -215,7 +215,7 @@ namespace bpa {
 
 				const auto c = computeBallCenter(Face{{e->b, e->a, p}}, radius);
 				if (!c) {
-					ss << i << ".    " << p->pos << " center computation failed\n";
+					if (debug) ss << i << ".    " << p->pos << " center computation failed\n";
 					continue;
 				}
 
@@ -230,7 +230,7 @@ namespace bpa {
 				const auto newCenterVec = glm::normalize(c.value() - m);
 				const auto newCenterFaceDot = glm::dot(newCenterVec, newFaceNormal);
 				if (newCenterFaceDot < 0) {
-					ss << i << ".    " << p->pos << " ball center " << c.value() << " underneath triangle\n";
+					if (debug) ss << i << ".    " << p->pos << " ball center " << c.value() << " underneath triangle\n";
 					continue;
 				}
 
@@ -238,7 +238,7 @@ namespace bpa {
 				for (const auto* ee : p->edges) {
 					const auto* otherPoint = ee->a == p ? ee->b : ee->a;
 					if (ee->status == EdgeStatus::inner && (otherPoint == e->a || otherPoint == e->b)) {
-						ss << i << ".    " << p->pos << " inner edge exists\n";
+						if (debug) ss << i << ".    " << p->pos << " inner edge exists\n";
 						goto nextneighbor;
 					}
 				}
@@ -247,7 +247,7 @@ namespace bpa {
 				if (glm::dot(glm::cross(newCenterVec, oldCenterVec), e->a->pos - e->b->pos) < 0)
 					angle += pi;
 				const auto empty = ballIsEmpty(c.value(), neighborhood, radius);
-				ss << i << ".    " << p->pos << " center " << c.value() << " empty " << empty << " angle " << angle << " newCenterFaceDot " << newCenterFaceDot << "\n";
+				if (debug) ss << i << ".    " << p->pos << " center " << c.value() << " empty " << empty << " angle " << angle << " newCenterFaceDot " << newCenterFaceDot << "\n";
 
 				if (angle < smallestAngle && empty) {
 					smallestAngle = angle;
@@ -259,11 +259,11 @@ namespace bpa {
 			}
 
 			if (smallestAngle != std::numeric_limits<float>::max()) {
-				ss << "        picking point " << smallestNumber << "\n";
+				if (debug) ss << "        picking point " << smallestNumber << "\n";
 				if (debug) savePoints(std::to_string(counter) + "_candidate.ply", {pointWithSmallestAngle->pos});
 				return PivotResult{pointWithSmallestAngle, centerOfSmallest};
 			}
-			std::cout << ss.str();
+			if (debug) std::cout << ss.str();
 
 			return {};
 		}
