@@ -249,15 +249,13 @@ namespace bpa {
 				auto angle = std::acos(std::clamp(glm::dot(oldCenterVec, newCenterVec), -1.0f, 1.0f));
 				if (glm::dot(glm::cross(newCenterVec, oldCenterVec), e->a->pos - e->b->pos) < 0)
 					angle += pi;
-				const auto empty = ballIsEmpty(c.value(), neighborhood, radius);
-				if (debug) ss << i << ".    " << p->pos << " center " << c.value() << " empty " << empty << " angle " << angle << " newCenterFaceDot " << newCenterFaceDot << "\n";
-
-				if (angle < smallestAngle && empty) {
+				if (angle < smallestAngle && ballIsEmpty(c.value(), neighborhood, radius)) {
 					smallestAngle = angle;
 					pointWithSmallestAngle = p;
 					centerOfSmallest = c.value();
 					smallestNumber = i;
 				}
+				if (debug) ss << i << ".    " << p->pos << " center " << c.value() << " empty " << ballIsEmpty(c.value(), neighborhood, radius) << " angle " << angle << " newCenterFaceDot " << newCenterFaceDot << "\n";
 			nextneighbor:;
 			}
 
