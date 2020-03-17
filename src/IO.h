@@ -51,3 +51,17 @@ inline void savePoints(std::filesystem::path path, const std::vector<glm::vec3>&
 	f.write(reinterpret_cast<const char*>(points.data()), points.size() * sizeof(glm::vec3));
 	f.close();
 }
+
+inline auto loadXYZ(std::filesystem::path path) -> std::vector<glm::vec3> {
+	std::ifstream f{path};
+	if (!f)
+		throw std::runtime_error("Faild to read file " + path.string());
+
+	std::vector<glm::vec3> result;
+	while (!f.eof()) {
+		glm::vec3 pos, normal;
+		f >> pos.x >> pos.y >> pos.z >> normal.x >> normal.y >> normal.z;
+		result.push_back(pos);
+	}
+	return result;
+}

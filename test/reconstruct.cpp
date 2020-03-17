@@ -29,11 +29,18 @@ namespace {
 	}
 }
 
-TEST(reconstruct, sphere) {
+TEST(reconstruct, sphere_36_18) {
 	const auto cloud = createSphericalCloud(36, 18);
-	savePoints("sphere_cloud.ply", cloud);
+	savePoints("sphere_36_18_cloud.ply", cloud);
 	const auto mesh = bpa::reconstruct(cloud, 0.3f);
-	saveTriangles("sphere_mesh.stl", mesh);
+	saveTriangles("sphere_36_18_mesh.stl", mesh);
+}
+
+TEST(reconstruct, sphere_360_180) {
+	const auto cloud = createSphericalCloud(360, 180);
+	savePoints("sphere_360_180_cloud.ply", cloud);
+	const auto mesh = bpa::reconstruct(cloud, 0.03f);
+	saveTriangles("sphere_360_180_mesh.stl", mesh);
 }
 
 TEST(reconstruct, tetrahedron) {
@@ -62,4 +69,10 @@ TEST(reconstruct, cube) {
 	savePoints("cube_cloud.ply", cloud);
 	const auto mesh = bpa::reconstruct(cloud, 2);
 	saveTriangles("cube_mesh.stl", mesh);
+}
+
+TEST(reconstruct, bunny) {
+	const auto cloud = loadXYZ("../test/data/bunny.xyz");
+	const auto mesh = bpa::reconstruct(cloud, 0.003f);
+	saveTriangles("bunny_mesh.stl", mesh);
 }
