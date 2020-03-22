@@ -14,7 +14,7 @@ find_package(GTest MODULE REQUIRED)
 
 # library
 file(GLOB source_files src/*)
-add_library(${PROJECT_NAME} ${source_files})
+add_library(${PROJECT_NAME} ${source_files} README.md)
 source_group("" FILES ${source_files})
 source_group(TREE ${CMAKE_CURRENT_LIST_DIR} FILES ${source_files})
 
