@@ -1,6 +1,5 @@
 #include "bpa.h"
 
-#include <boost/math/constants/constants.hpp>
 #include <algorithm>
 #include <deque>
 #include <optional>
@@ -8,6 +7,7 @@
 #include <iostream>
 #include <sstream>
 #include <numeric>
+#include <numbers>
 
 #include <glm/gtx/io.hpp>
 
@@ -19,7 +19,6 @@ using glm::ivec3;
 namespace bpa {
 	namespace {
 		constexpr auto debug = false;
-		constexpr auto pi = boost::math::constants::pi<float>();
 
 		struct MeshEdge;
 
@@ -254,7 +253,7 @@ namespace bpa {
 
 				auto angle = std::acos(std::clamp(glm::dot(oldCenterVec, newCenterVec), -1.0f, 1.0f));
 				if (glm::dot(glm::cross(newCenterVec, oldCenterVec), e->a->pos - e->b->pos) < 0)
-					angle += pi;
+					angle += std::numbers::pi_v<float>;
 				if (angle < smallestAngle) {
 					smallestAngle = angle;
 					pointWithSmallestAngle = p;
