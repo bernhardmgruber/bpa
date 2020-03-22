@@ -372,7 +372,7 @@ namespace bpa {
 		std::vector<Triangle> triangles;
 		std::deque<MeshEdge> edges;
 
-		auto [seed, ballCenter] = *seedResult;
+		auto [seed, ballCenter] = seedResult.value();
 		outputTriangle(seed, triangles);
 		auto& e0 = edges.emplace_back(MeshEdge{seed[0], seed[1], seed[2], ballCenter});
 		auto& e1 = edges.emplace_back(MeshEdge{seed[1], seed[2], seed[0], ballCenter});
