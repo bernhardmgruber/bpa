@@ -141,8 +141,8 @@ namespace bpa {
 		}
 
 		auto ballIsEmpty(vec3 ballCenter, const std::vector<MeshPoint*>& points, float radius) -> bool {
-			return std::all_of(begin(points), end(points), [&](MeshPoint* p) {
-				return glm::dot(p->pos - ballCenter, p->pos - ballCenter) > radius * radius - 1e-4f; // TODO epsilon
+			return !std::any_of(begin(points), end(points), [&](MeshPoint* p) {
+				return glm::dot(p->pos - ballCenter, p->pos - ballCenter) < radius * radius - 1e-4f; // TODO epsilon
 			});
 		}
 
