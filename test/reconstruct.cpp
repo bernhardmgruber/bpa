@@ -8,12 +8,14 @@
 #include "../src/bpa.h"
 #include "../src/IO.h"
 
+using namespace bpa;
+
 namespace {
 	constexpr auto pi = boost::math::constants::pi<double>();
 
-	auto createSphericalCloud(int slices, int stacks) -> std::vector<bpa::Point> {
-		std::vector<bpa::Point> points;
-		points.emplace_back(bpa::Point{{0, 0, -1}, {0, 0, -1}});
+	auto createSphericalCloud(int slices, int stacks) -> std::vector<Point> {
+		std::vector<Point> points;
+		points.emplace_back(Point{{0, 0, -1}, {0, 0, -1}});
 		for (auto slice = 0; slice < slices; slice++) {
 			for (auto stack = 1; stack < stacks; stack++) {
 				const auto yaw = (static_cast<double>(slice) / slices) * 2 * pi;
@@ -27,13 +29,13 @@ namespace {
 				points.push_back({v, glm::normalize(v - glm::vec3{})});
 			}
 		}
-		points.emplace_back(bpa::Point{{0, 0, 1}, {0, 0, 1}});
+		points.emplace_back(Point{{0, 0, 1}, {0, 0, 1}});
 		return points;
 	}
 
-	auto measuredReconstruct(const std::vector<bpa::Point>& points, float radius) -> std::vector<bpa::Triangle> {
+	auto measuredReconstruct(const std::vector<Point>& points, float radius) -> std::vector<Triangle> {
 		const auto start = std::chrono::high_resolution_clock::now();
-		auto result = bpa::reconstruct(points, radius);
+		auto result = reconstruct(points, radius);
 		const auto end = std::chrono::high_resolution_clock::now();
 		const auto seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start).count();
 		std::cerr << "[          ] Point: " << points.size() << " Triangles: " << result.size() << " T/s: " << result.size() / seconds << '\n';
@@ -63,7 +65,7 @@ TEST(reconstruct, sphere_200_100) {
 }
 
 TEST(reconstruct, tetrahedron) {
-	const auto cloud = std::vector<bpa::Point>{
+	const auto cloud = std::vector<Point>{
 		{{0, 0, 0}, glm::normalize(glm::vec3{-1, -1, -1})},
 		{{0, 1, 0}, glm::normalize(glm::vec3{0, 1, 0})},
 		{{1, 0, 0}, glm::normalize(glm::vec3{1, 0, 0})},
@@ -75,7 +77,7 @@ TEST(reconstruct, tetrahedron) {
 }
 
 TEST(reconstruct, cube) {
-	const auto cloud = std::vector<bpa::Point>{
+	const auto cloud = std::vector<Point>{
 		{{-1, -1, -1}, glm::normalize(glm::vec3{-1, -1, -1})},
 		{{-1, +1, -1}, glm::normalize(glm::vec3{-1, +1, -1})},
 		{{+1, +1, -1}, glm::normalize(glm::vec3{+1, +1, -1})},

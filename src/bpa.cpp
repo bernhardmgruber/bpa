@@ -13,8 +13,7 @@
 
 #include "IO.h"
 
-using glm::vec3;
-using glm::ivec3;
+using namespace glm;
 
 namespace bpa {
 	namespace {
@@ -47,7 +46,7 @@ namespace bpa {
 
 		struct MeshFace : std::array<MeshPoint*, 3>{
 			auto normal() const {
-				return glm::normalize(glm::cross((*this)[0]->pos - (*this)[1]->pos, (*this)[0]->pos - (*this)[2]->pos));
+				return normalize(cross((*this)[0]->pos - (*this)[1]->pos, (*this)[0]->pos - (*this)[2]->pos));
 			}
 		};
 
@@ -60,14 +59,14 @@ namespace bpa {
 				: lower(lower), upper(upper), cellSize(cellSize) {
 
 				const auto sizes = upper - lower;
-				dims = ivec3{glm::ceil(sizes / cellSize)};
-				dims = glm::max(dims, ivec3{1}); // for planar clouds
+				dims = ivec3{ceil(sizes / cellSize)};
+				dims = max(dims, ivec3{1}); // for planar clouds
 				cells.resize(dims.x * dims.y * dims.z);
 			}
 
 			auto cellIndex(vec3 point) -> ivec3 {
 				const auto index = ivec3{(point - lower) / cellSize};
-				return glm::clamp(index, ivec3{}, dims - 1);
+				return clamp(index, ivec3{}, dims - 1);
 			}
 
 			auto cell(ivec3 index) -> Cell& {
@@ -87,7 +86,7 @@ namespace bpa {
 							if (index.z < 0 || index.z >= dims.z) continue;
 							auto& c = cell(index);
 							for (auto& p : c.points)
-								if (glm::length2(p.pos - point) < cellSize * cellSize && std::find(begin(ignore), end(ignore), p.pos) == end(ignore))
+								if (length2(p.pos - point) < cellSize * cellSize && std::find(begin(ignore), end(ignore), p.pos) == end(ignore))
 									result.push_back(&p);
 						}
 					}
@@ -123,11 +122,11 @@ namespace bpa {
 			// from https://gamedev.stackexchange.com/questions/60630/how-do-i-find-the-circumcenter-of-a-triangle-in-3d
 			const vec3 ac = f[2]->pos - f[0]->pos;
 			const vec3 ab = f[1]->pos - f[0]->pos;
-			const vec3 abXac = glm::cross(ab, ac);
-			const vec3 toCircumCircleCenter = (glm::cross(abXac, ab) * glm::dot(ac, ac) + glm::cross(ac, abXac) * glm::dot(ab, ab)) / (2 * glm::dot(abXac, abXac));
+			const vec3 abXac = cross(ab, ac);
+			const vec3 toCircumCircleCenter = (cross(abXac, ab) * dot(ac, ac) + cross(ac, abXac) * dot(ab, ab)) / (2 * dot(abXac, abXac));
 			const vec3 circumCircleCenter = f[0]->pos + toCircumCircleCenter;
 
-			const auto heightSquared = radius * radius - glm::dot(toCircumCircleCenter, toCircumCircleCenter);
+			const auto heightSquared = radius * radius - dot(toCircumCircleCenter, toCircumCircleCenter);
 			if (heightSquared < 0)
 				return {};
 			auto ballCenter = circumCircleCenter + f.normal() * std::sqrt(heightSquared);
@@ -136,7 +135,7 @@ namespace bpa {
 
 		auto ballIsEmpty(vec3 ballCenter, const std::vector<MeshPoint*>& points, float radius) -> bool {
 			return !std::any_of(begin(points), end(points), [&](MeshPoint* p) {
-				return glm::length2(p->pos - ballCenter) < radius * radius - 1e-4f; // TODO epsilon
+				return length2(p->pos - ballCenter) < radius * radius - 1e-4f; // TODO epsilon
 			});
 		}
 
@@ -153,7 +152,7 @@ namespace bpa {
 				for (auto& p1 : cell.points) {
 					auto neighborhood = grid.sphericalNeighborhood(p1.pos, {p1.pos});
 					std::sort(begin(neighborhood), end(neighborhood), [&](MeshPoint* a, MeshPoint* b) {
-						return glm::length(a->pos - p1.pos) < glm::length(b->pos - p1.pos);
+						return length(a->pos - p1.pos) < length(b->pos - p1.pos);
 					});
 
 					for (auto& p2 : neighborhood) {
@@ -193,7 +192,7 @@ namespace bpa {
 
 		auto ballPivot(const MeshEdge* e, Grid& grid, float radius) -> std::optional<PivotResult> {
 			const auto m = (e->a->pos + e->b->pos) / 2.0f;
-			const auto oldCenterVec = glm::normalize(e->center - m);
+			const auto oldCenterVec = normalize(e->center - m);
 			auto neighborhood = grid.sphericalNeighborhood(m, {e->a->pos, e->b->pos, e->opposite->pos});
 
 			static auto counter = 0;
@@ -235,8 +234,8 @@ namespace bpa {
 				}
 
 				// this check is not in the paper: the ball center must always be above the triangle
-				const auto newCenterVec = glm::normalize(c.value() - m);
-				const auto newCenterFaceDot = glm::dot(newCenterVec, newFaceNormal);
+				const auto newCenterVec = normalize(c.value() - m);
+				const auto newCenterFaceDot = dot(newCenterVec, newFaceNormal);
 				if (newCenterFaceDot < 0) {
 					if (debug) ss << i << ".    " << p->pos << " ball center " << c.value() << " underneath triangle\n";
 					continue;
@@ -251,8 +250,8 @@ namespace bpa {
 					}
 				}
 
-				auto angle = std::acos(std::clamp(glm::dot(oldCenterVec, newCenterVec), -1.0f, 1.0f));
-				if (glm::dot(glm::cross(newCenterVec, oldCenterVec), e->a->pos - e->b->pos) < 0)
+				auto angle = std::acos(std::clamp(dot(oldCenterVec, newCenterVec), -1.0f, 1.0f));
+				if (dot(cross(newCenterVec, oldCenterVec), e->a->pos - e->b->pos) < 0)
 					angle += std::numbers::pi_v<float>;
 				if (angle < smallestAngle) {
 					smallestAngle = angle;
