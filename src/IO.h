@@ -3,17 +3,9 @@
 #include <filesystem>
 #include <fstream>
 
-#include <glm/vec3.hpp>
+#include "bpa.h"
 
-template <typename T>
-concept Triangle = requires (T t) {
-	{ t[0] } -> glm::vec3;
-	{ t[1] } -> glm::vec3;
-	{ t[2] } -> glm::vec3;
-};
-
-template <Triangle T>
-void saveTriangles(std::filesystem::path path, const std::vector<T>& triangles) {
+inline void saveTriangles(std::filesystem::path path, const std::vector<bpa::Triangle>& triangles) {
 	if (path.has_parent_path())
 		create_directories(path.parent_path());
 	std::ofstream f{path, std::ios::binary};
@@ -37,6 +29,24 @@ void saveTriangles(std::filesystem::path path, const std::vector<T>& triangles) 
 	f.close();
 }
 
+inline void savePoints(std::filesystem::path path, const std::vector<bpa::Point>& points) {
+	if (path.has_parent_path())
+		create_directories(path.parent_path());
+	std::ofstream f{path, std::ios::binary};
+	f << "ply\n";
+	f << "format binary_little_endian 1.0\n";
+	f << "element vertex " << points.size() << "\n";
+	f << "property float x\n";
+	f << "property float y\n";
+	f << "property float z\n";
+	f << "property float nx\n";
+	f << "property float ny\n";
+	f << "property float nz\n";
+	f << "end_header\n";
+	f.write(reinterpret_cast<const char*>(points.data()), points.size() * sizeof(points[0]));
+	f.close();
+}
+
 inline void savePoints(std::filesystem::path path, const std::vector<glm::vec3>& points) {
 	if (path.has_parent_path())
 		create_directories(path.parent_path());
@@ -48,20 +58,20 @@ inline void savePoints(std::filesystem::path path, const std::vector<glm::vec3>&
 	f << "property float y\n";
 	f << "property float z\n";
 	f << "end_header\n";
-	f.write(reinterpret_cast<const char*>(points.data()), points.size() * sizeof(glm::vec3));
+	f.write(reinterpret_cast<const char*>(points.data()), points.size() * sizeof(points[0]));
 	f.close();
 }
 
-inline auto loadXYZ(std::filesystem::path path) -> std::vector<glm::vec3> {
+inline auto loadXYZ(std::filesystem::path path) -> std::vector<bpa::Point> {
 	std::ifstream f{path};
 	if (!f)
 		throw std::runtime_error("Faild to read file " + path.string());
 
-	std::vector<glm::vec3> result;
+	std::vector<bpa::Point> result;
 	while (!f.eof()) {
-		glm::vec3 pos, normal;
-		f >> pos.x >> pos.y >> pos.z >> normal.x >> normal.y >> normal.z;
-		result.push_back(pos);
+		bpa::Point p;
+		f >> p.pos.x >> p.pos.y >> p.pos.z >> p.normal.x >> p.normal.y >> p.normal.z;
+		result.push_back(p);
 	}
 	return result;
 }

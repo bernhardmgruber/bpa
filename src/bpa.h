@@ -12,5 +12,10 @@ namespace bpa {
 		}
 	};
 
-	auto reconstruct(const std::vector<glm::vec3>& points, float radius) -> std::vector<Triangle>;
+	struct Point {
+		glm::vec3 pos;
+		glm::vec3 normal;
+	};
+
+	auto reconstruct(const std::vector<Point>& points, float radius) -> std::vector<Triangle>;
 }

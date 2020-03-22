@@ -9,22 +9,22 @@ namespace {
 	constexpr auto pi = boost::math::constants::pi<double>();
 
 	auto createSphericalCloud(int slices, int stacks) {
-		std::vector<glm::vec3> points;
-		points.emplace_back(0, 0, -1);
+		std::vector<bpa::Point> points;
+		points.emplace_back(bpa::Point{{0, 0, -1}, {0, 0, -1}});
 		for (auto slice = 0; slice < slices; slice++) {
 			for (auto stack = 1; stack < stacks; stack++) {
 				const auto yaw = (static_cast<double>(slice) / slices) * 2 * pi;
 				const auto z = std::sin((static_cast<double>(stack) / stacks - 0.5) * pi);
 				const auto r = std::sqrt(1 - z * z);
 
-				glm::dvec3 v;
-				v.x = r * std::sin(yaw);
-				v.y = r * std::cos(yaw);
-				v.z = z;
-				points.push_back(v);
+				glm::vec3 v;
+				v.x = static_cast<float>(r * std::sin(yaw));
+				v.y = static_cast<float>(r * std::cos(yaw));
+				v.z = static_cast<float>(z);
+				points.push_back({v, glm::normalize(v - glm::vec3{})});
 			}
 		}
-		points.emplace_back(0, 0, 1);
+		points.emplace_back(bpa::Point{{0, 0, 1}, {0, 0, 1}});
 		return points;
 	}
 }
@@ -51,11 +51,11 @@ TEST(reconstruct, sphere_200_100) {
 }
 
 TEST(reconstruct, tetrahedron) {
-	const auto cloud = std::vector<glm::vec3>{
-		{0, 0, 0},
-		{0, 1, 0},
-		{1, 0, 0},
-		{0, 0, 1},
+	const auto cloud = std::vector<bpa::Point>{
+		{{0, 0, 0}, glm::normalize(glm::vec3{-1, -1, -1})},
+		{{0, 1, 0}, glm::normalize(glm::vec3{0, 1, 0})},
+		{{1, 0, 0}, glm::normalize(glm::vec3{1, 0, 0})},
+		{{0, 0, 1}, glm::normalize(glm::vec3{0, 0, 1})}
 	};
 	savePoints("tetrahedron_cloud.ply", cloud);
 	const auto mesh = bpa::reconstruct(cloud, 2);
@@ -63,15 +63,15 @@ TEST(reconstruct, tetrahedron) {
 }
 
 TEST(reconstruct, cube) {
-	const auto cloud = std::vector<glm::vec3>{
-		{0, 0, 0},
-		{0, 1, 0},
-		{1, 1, 0},
-		{1, 0, 0},
-		{0, 0, 1},
-		{0, 1, 1},
-		{1, 1, 1},
-		{1, 0, 1},
+	const auto cloud = std::vector<bpa::Point>{
+		{{-1, -1, -1}, glm::normalize(glm::vec3{-1, -1, -1})},
+		{{-1, +1, -1}, glm::normalize(glm::vec3{-1, +1, -1})},
+		{{+1, +1, -1}, glm::normalize(glm::vec3{+1, +1, -1})},
+		{{+1, -1, -1}, glm::normalize(glm::vec3{+1, -1, -1})},
+		{{-1, -1, +1}, glm::normalize(glm::vec3{-1, -1, +1})},
+		{{-1, +1, +1}, glm::normalize(glm::vec3{-1, +1, +1})},
+		{{+1, +1, +1}, glm::normalize(glm::vec3{+1, +1, +1})},
+		{{+1, -1, +1}, glm::normalize(glm::vec3{+1, -1, +1})},
 	};
 	savePoints("cube_cloud.ply", cloud);
 	const auto mesh = bpa::reconstruct(cloud, 2);
