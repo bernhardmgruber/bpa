@@ -39,15 +39,15 @@ TEST(reconstruct, sphere_36_18) {
 TEST(reconstruct, sphere_100_50) {
 	const auto cloud = createSphericalCloud(100, 50);
 	savePoints("sphere_100_50_cloud.ply", cloud);
-	const auto mesh = bpa::reconstruct(cloud, 0.3f);
+	const auto mesh = bpa::reconstruct(cloud, 0.1f);
 	saveTriangles("sphere_100_50_mesh.stl", mesh);
 }
 
-TEST(reconstruct, sphere_360_180) {
-	const auto cloud = createSphericalCloud(360, 180);
-	savePoints("sphere_360_180_cloud.ply", cloud);
-	const auto mesh = bpa::reconstruct(cloud, 0.03f);
-	saveTriangles("sphere_360_180_mesh.stl", mesh);
+TEST(reconstruct, sphere_200_100) {
+	const auto cloud = createSphericalCloud(200, 100);
+	savePoints("sphere_200_100_cloud.ply", cloud);
+	const auto mesh = bpa::reconstruct(cloud, 0.04f);
+	saveTriangles("sphere_200_100_mesh.stl", mesh);
 }
 
 TEST(reconstruct, tetrahedron) {
@@ -80,6 +80,6 @@ TEST(reconstruct, cube) {
 
 TEST(reconstruct, bunny) {
 	const auto cloud = loadXYZ("../test/data/bunny.xyz");
-	const auto mesh = bpa::reconstruct(cloud, 0.003f);
+	const auto mesh = bpa::reconstruct(cloud, 0.002f);
 	saveTriangles("bunny_mesh.stl", mesh);
 }
