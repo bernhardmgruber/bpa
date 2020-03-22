@@ -78,6 +78,7 @@ namespace bpa {
 			auto sphericalNeighborhood(vec3 point, std::initializer_list<vec3> ignore) -> std::vector<MeshPoint*> {
 				std::vector<MeshPoint*> result;
 				const auto centerIndex = cellIndex(point);
+				result.reserve(cell(centerIndex).points.size() * 27); // just an estimate
 				for (auto xOff : {-1, 0, 1}) {
 					for (auto yOff : {-1, 0, 1}) {
 						for (auto zOff : {-1, 0, 1}) {
