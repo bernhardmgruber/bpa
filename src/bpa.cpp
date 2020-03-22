@@ -7,6 +7,7 @@
 #include <string>
 #include <iostream>
 #include <sstream>
+#include <numeric>
 
 #include <glm/gtx/io.hpp>
 
@@ -152,6 +153,9 @@ namespace bpa {
 
 		auto findSeedTriangle(Grid& grid, float radius) -> std::optional<SeedResult> {
 			for (auto& cell : grid.cells) {
+				const auto avgNormal = normalize(std::reduce(begin(cell.points), end(cell.points), vec3{}, [](vec3 acc, const MeshPoint& p) {
+					return acc + p.normal;
+				}));
 				for (auto& p1 : cell.points) {
 					auto neighborhood = grid.sphericalNeighborhood(p1.pos, {p1.pos});
 					std::sort(begin(neighborhood), end(neighborhood), [&](MeshPoint* a, MeshPoint* b) {
@@ -162,6 +166,8 @@ namespace bpa {
 						for (auto& p3 : neighborhood) {
 							if (p2 == p3) continue;
 							MeshFace f{{&p1, p2, p3}};
+							if (dot(f.normal(), avgNormal) < 0) // only accept triangles which's normal points into the same half-space as the average normal of this cell's points
+								continue;
 							const auto ballCenter = computeBallCenter(f, radius);
 							if (ballCenter && ballIsEmpty(ballCenter.value(), neighborhood, radius)) {
 								p1.used = true;
