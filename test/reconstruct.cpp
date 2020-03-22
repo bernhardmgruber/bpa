@@ -8,7 +8,7 @@
 namespace {
 	constexpr auto pi = boost::math::constants::pi<double>();
 
-	auto createSphericalCloud(int slices, int stacks) {
+	auto createSphericalCloud(int slices, int stacks) -> std::vector<bpa::Point> {
 		std::vector<bpa::Point> points;
 		points.emplace_back(bpa::Point{{0, 0, -1}, {0, 0, -1}});
 		for (auto slice = 0; slice < slices; slice++) {
