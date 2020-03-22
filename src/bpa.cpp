@@ -217,6 +217,10 @@ namespace bpa {
 				i++;
 				auto newFaceNormal = Triangle{e->b->pos, e->a->pos, p->pos}.normal();
 
+				// this check is not in the paper: all points' normals must point into the same half-space
+				if (dot(newFaceNormal, p->normal) < 0)
+					continue;
+
 				const auto c = computeBallCenter(MeshFace{{e->b, e->a, p}}, radius);
 				if (!c) {
 					if (debug) ss << i << ".    " << p->pos << " center computation failed\n";
