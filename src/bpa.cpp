@@ -249,20 +249,25 @@ namespace bpa {
 				auto angle = std::acos(std::clamp(glm::dot(oldCenterVec, newCenterVec), -1.0f, 1.0f));
 				if (glm::dot(glm::cross(newCenterVec, oldCenterVec), e->a->pos - e->b->pos) < 0)
 					angle += pi;
-				if (angle < smallestAngle && ballIsEmpty(c.value(), neighborhood, radius)) {
+				if (angle < smallestAngle) {
 					smallestAngle = angle;
 					pointWithSmallestAngle = p;
 					centerOfSmallest = c.value();
 					smallestNumber = i;
 				}
-				if (debug) ss << i << ".    " << p->pos << " center " << c.value() << " empty " << ballIsEmpty(c.value(), neighborhood, radius) << " angle " << angle << " newCenterFaceDot " << newCenterFaceDot << "\n";
+				if (debug) ss << i << ".    " << p->pos << " center " << c.value() << " angle " << angle << " newCenterFaceDot " << newCenterFaceDot << "\n";
 			nextneighbor:;
 			}
 
 			if (smallestAngle != std::numeric_limits<float>::max()) {
-				if (debug) ss << "        picking point " << smallestNumber << "\n";
-				if (debug) savePoints(std::to_string(counter) + "_candidate.ply", {pointWithSmallestAngle->pos});
-				return PivotResult{pointWithSmallestAngle, centerOfSmallest};
+				if (ballIsEmpty(centerOfSmallest, neighborhood, radius)) {
+					if (debug) {
+						ss << "        picking point " << smallestNumber << "\n";
+						savePoints(std::to_string(counter) + "_candidate.ply", {pointWithSmallestAngle->pos});
+					}
+					return PivotResult{pointWithSmallestAngle, centerOfSmallest};
+				} else if(debug)
+					ss << "        found candidate " << smallestNumber << " but ball is not empty\n";
 			}
 			if (debug) std::cout << ss.str();
 
