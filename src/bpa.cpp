@@ -377,12 +377,12 @@ namespace bpa {
 		auto& e0 = edges.emplace_back(MeshEdge{seed[0], seed[1], seed[2], ballCenter});
 		auto& e1 = edges.emplace_back(MeshEdge{seed[1], seed[2], seed[0], ballCenter});
 		auto& e2 = edges.emplace_back(MeshEdge{seed[2], seed[0], seed[1], ballCenter});
-		e0.prev = &e2;
-		e0.next = &e1;
-		e1.prev = &e0;
-		e1.next = &e2;
-		e2.prev = &e1;
-		e2.next = &e0;
+		e0.prev = e1.next = &e2;
+		e0.next = e2.prev = &e1;
+		e1.prev = e2.next = &e0;
+		seed[0]->edges = { &e0, &e2 };
+		seed[1]->edges = { &e0, &e1 };
+		seed[2]->edges = { &e1, &e2 };
 		std::vector<MeshEdge*> front{&e0, &e1, &e2};
 
 		if (debug) saveTriangles("seed.stl", triangles);
