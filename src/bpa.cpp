@@ -368,6 +368,13 @@ namespace bpa {
 			remove(a);
 			remove(b);
 		}
+
+		auto findReverseEdgeOnFront(MeshEdge* edge, std::vector<MeshEdge*>& front) -> MeshEdge* {
+			const auto it = std::find_if(begin(front), end(front), [&](const MeshEdge* e) { return e->status == EdgeStatus::active && edge->a == e->b && edge->b == e->a; });
+			if (it != end(front))
+				return *it;
+			return nullptr;
+		}
 	}
 
 	auto reconstruct(const std::vector<Point>& points, float radius) -> std::vector<Triangle> {
@@ -405,8 +412,8 @@ namespace bpa {
 			if (o_k && (notUsed(o_k->p) || onFront(o_k->p))) {
 				outputTriangle({{e_ij.value()->a, o_k->p, e_ij.value()->b}}, triangles);
 				auto [e_ik, e_kj] = join(e_ij.value(), o_k->p, o_k->center, front, edges);
-				if (auto e_ki = std::find_if(begin(front), end(front), [&](const MeshEdge* e) { return e->status == EdgeStatus::active && e_ik->a == e->b && e_ik->b == e->a; }); e_ki != end(front)) glue(e_ik, *e_ki, front);
-				if (auto e_jk = std::find_if(begin(front), end(front), [&](const MeshEdge* e) { return e->status == EdgeStatus::active && e_kj->a == e->b && e_kj->b == e->a; }); e_jk != end(front)) glue(e_kj, *e_jk, front);
+				if (auto* e_ki = findReverseEdgeOnFront(e_ik, front)) glue(e_ik, e_ki, front);
+				if (auto* e_jk = findReverseEdgeOnFront(e_kj, front)) glue(e_kj, e_jk, front);
 			} else {
 				if (debug) savePoints("current_boundary_point.ply", {o_k->p->pos});
 				e_ij.value()->status = EdgeStatus::boundary;
