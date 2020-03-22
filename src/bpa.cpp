@@ -50,18 +50,26 @@ namespace bpa {
 			}
 		};
 
-		struct Cell {
-			std::vector<MeshPoint> points;
-		};
+		using Cell = std::vector<MeshPoint>;
 
 		struct Grid {
-			Grid(vec3 lower, vec3 upper, float cellSize)
-				: lower(lower), upper(upper), cellSize(cellSize) {
+			Grid(const std::vector<Point>& points, float radius)
+				: cellSize(radius * 2) {
+				lower = points.front().pos;
+				upper = points.front().pos;
 
-				const auto sizes = upper - lower;
-				dims = ivec3{ceil(sizes / cellSize)};
-				dims = max(dims, ivec3{1}); // for planar clouds
+				for (const auto& p : points) {
+					for (auto i = 0; i < 3; i++) {
+						lower[i] = std::min(lower[i], p.pos[i]);
+						upper[i] = std::max(upper[i], p.pos[i]);
+					}
+				}
+
+				dims = max(ivec3{ceil((upper - lower) / cellSize)}, ivec3{1});
+
 				cells.resize(dims.x * dims.y * dims.z);
+				for (const auto& p : points)
+					cell(cellIndex(p.pos)).push_back({p.pos, p.normal});
 			}
 
 			auto cellIndex(vec3 point) -> ivec3 {
@@ -76,7 +84,7 @@ namespace bpa {
 			auto sphericalNeighborhood(vec3 point, std::initializer_list<vec3> ignore) -> std::vector<MeshPoint*> {
 				std::vector<MeshPoint*> result;
 				const auto centerIndex = cellIndex(point);
-				result.reserve(cell(centerIndex).points.size() * 27); // just an estimate
+				result.reserve(cell(centerIndex).size() * 27); // just an estimate
 				for (auto xOff : {-1, 0, 1}) {
 					for (auto yOff : {-1, 0, 1}) {
 						for (auto zOff : {-1, 0, 1}) {
@@ -84,8 +92,7 @@ namespace bpa {
 							if (index.x < 0 || index.x >= dims.x) continue;
 							if (index.y < 0 || index.y >= dims.y) continue;
 							if (index.z < 0 || index.z >= dims.z) continue;
-							auto& c = cell(index);
-							for (auto& p : c.points)
+							for (auto& p : cell(index))
 								if (length2(p.pos - point) < cellSize * cellSize && std::find(begin(ignore), end(ignore), p.pos) == end(ignore))
 									result.push_back(&p);
 						}
@@ -100,23 +107,6 @@ namespace bpa {
 			ivec3 dims;
 			std::vector<Cell> cells;
 		};
-
-		auto buildGrid(const std::vector<Point>& points, float radius) {
-			vec3 lower = points.front().pos;
-			vec3 upper = points.front().pos;
-
-			for (const auto& p : points) {
-				for (auto i = 0; i < 3; i++) {
-					lower[i] = std::min(lower[i], p.pos[i]);
-					upper[i] = std::max(upper[i], p.pos[i]);
-				}
-			}
-
-			Grid g(lower, upper, radius * 2);
-			for (const auto& p : points)
-				g.cell(g.cellIndex(p.pos)).points.push_back({p.pos, p.normal});
-			return g;
-		}
 
 		auto computeBallCenter(MeshFace f, float radius) -> std::optional<vec3> {
 			// from https://gamedev.stackexchange.com/questions/60630/how-do-i-find-the-circumcenter-of-a-triangle-in-3d
@@ -146,10 +136,10 @@ namespace bpa {
 
 		auto findSeedTriangle(Grid& grid, float radius) -> std::optional<SeedResult> {
 			for (auto& cell : grid.cells) {
-				const auto avgNormal = normalize(std::reduce(begin(cell.points), end(cell.points), vec3{}, [](vec3 acc, const MeshPoint& p) {
+				const auto avgNormal = normalize(std::reduce(begin(cell), end(cell), vec3{}, [](vec3 acc, const MeshPoint& p) {
 					return acc + p.normal;
 				}));
-				for (auto& p1 : cell.points) {
+				for (auto& p1 : cell) {
 					auto neighborhood = grid.sphericalNeighborhood(p1.pos, {p1.pos});
 					std::sort(begin(neighborhood), end(neighborhood), [&](MeshPoint* a, MeshPoint* b) {
 						return length(a->pos - p1.pos) < length(b->pos - p1.pos);
@@ -371,7 +361,7 @@ namespace bpa {
 	}
 
 	auto reconstruct(const std::vector<Point>& points, float radius) -> std::vector<Triangle> {
-		auto grid = buildGrid(points, radius);
+		Grid grid(points, radius);
 
 		const auto seedResult = findSeedTriangle(grid, radius);
 		if (!seedResult) {
