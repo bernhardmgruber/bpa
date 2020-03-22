@@ -75,7 +75,7 @@ namespace bpa {
 				return cells[index.z * dims.x * dims.y + index.y * dims.x + index.x];
 			}
 
-			auto neighborhood27(vec3 point) -> std::vector<MeshPoint*> {
+			auto sphericalNeighborhood(vec3 point, std::initializer_list<vec3> ignore) -> std::vector<MeshPoint*> {
 				std::vector<MeshPoint*> result;
 				const auto centerIndex = cellIndex(point);
 				for (auto xOff : {-1, 0, 1}) {
@@ -86,18 +86,12 @@ namespace bpa {
 							if (index.y < 0 || index.y >= dims.y) continue;
 							if (index.z < 0 || index.z >= dims.z) continue;
 							auto& c = cell(index);
-							std::transform(begin(c.points), end(c.points), std::back_inserter(result), [](auto& point) { return &point; });
+							for (auto& p : c.points)
+								if (glm::length2(p.pos - point) < cellSize * cellSize && std::find(begin(ignore), end(ignore), p.pos) == end(ignore))
+									result.push_back(&p);
 						}
 					}
 				}
-				return result;
-			}
-
-			auto sphericalNeighborhood(vec3 point, std::initializer_list<vec3> ignore) -> std::vector<MeshPoint*> {
-				auto result = neighborhood27(point);
-				result.erase(std::remove_if(begin(result), end(result), [&](MeshPoint* p) {
-					return glm::length(p->pos - point) > cellSize || std::find(begin(ignore), end(ignore), p->pos) != end(ignore);
-				}), end(result));
 				return result;
 			}
 
@@ -142,7 +136,7 @@ namespace bpa {
 
 		auto ballIsEmpty(vec3 ballCenter, const std::vector<MeshPoint*>& points, float radius) -> bool {
 			return !std::any_of(begin(points), end(points), [&](MeshPoint* p) {
-				return glm::dot(p->pos - ballCenter, p->pos - ballCenter) < radius * radius - 1e-4f; // TODO epsilon
+				return glm::length2(p->pos - ballCenter) < radius * radius - 1e-4f; // TODO epsilon
 			});
 		}
 
