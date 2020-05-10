@@ -1,9 +1,9 @@
-#include <boost/math/constants/constants.hpp>
 #include <gtest/gtest.h>
 #include <glm/glm.hpp>
 
 #include <chrono>
 #include <iostream>
+#include <numbers>
 
 #include "../src/bpa.h"
 #include "../src/IO.h"
@@ -11,15 +11,13 @@
 using namespace bpa;
 
 namespace {
-	constexpr auto pi = boost::math::constants::pi<double>();
-
 	auto createSphericalCloud(int slices, int stacks) -> std::vector<Point> {
 		std::vector<Point> points;
 		points.emplace_back(Point{{0, 0, -1}, {0, 0, -1}});
 		for (auto slice = 0; slice < slices; slice++) {
 			for (auto stack = 1; stack < stacks; stack++) {
-				const auto yaw = (static_cast<double>(slice) / slices) * 2 * pi;
-				const auto z = std::sin((static_cast<double>(stack) / stacks - 0.5) * pi);
+				const auto yaw = (static_cast<double>(slice) / slices) * 2 * std::numbers::pi;
+				const auto z = std::sin((static_cast<double>(stack) / stacks - 0.5) * std::numbers::pi);
 				const auto r = std::sqrt(1 - z * z);
 
 				glm::vec3 v;

@@ -6,9 +6,6 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # find packages
-find_package(Boost REQUIRED COMPONENTS system filesystem)
-include_directories(${Boost_INCLUDE_DIRS})
-
 find_package(glm CONFIG REQUIRED)
 find_package(GTest MODULE REQUIRED)
 
@@ -19,7 +16,6 @@ source_group("" FILES ${source_files})
 source_group(TREE ${CMAKE_CURRENT_LIST_DIR} FILES ${source_files})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
-	${Boost_LIBRARIES}
 	glm
 )
 
@@ -38,7 +34,6 @@ source_group(TREE ${CMAKE_CURRENT_LIST_DIR} FILES ${test_files})
 target_link_libraries(tests PRIVATE
 	${PROJECT_NAME}
 	GTest::GTest GTest::Main
-	${Boost_LIBRARIES}
 	glm
 )
 
