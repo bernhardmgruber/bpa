@@ -136,7 +136,7 @@ namespace bpa {
 
 		auto findSeedTriangle(Grid& grid, float radius) -> std::optional<SeedResult> {
 			for (auto& cell : grid.cells) {
-				const auto avgNormal = normalize(std::reduce(begin(cell), end(cell), vec3{}, [](vec3 acc, const MeshPoint& p) {
+				const auto avgNormal = normalize(std::accumulate(begin(cell), end(cell), vec3{}, [](vec3 acc, const MeshPoint& p) {
 					return acc + p.normal;
 				}));
 				for (auto& p1 : cell) {
@@ -240,16 +240,18 @@ namespace bpa {
 					}
 				}
 
-				auto angle = std::acos(std::clamp(dot(oldCenterVec, newCenterVec), -1.0f, 1.0f));
-				if (dot(cross(newCenterVec, oldCenterVec), e->a->pos - e->b->pos) < 0)
-					angle += std::numbers::pi_v<float>;
-				if (angle < smallestAngle) {
-					smallestAngle = angle;
-					pointWithSmallestAngle = p;
-					centerOfSmallest = c.value();
-					smallestNumber = i;
+				{
+					auto angle = std::acos(std::clamp(dot(oldCenterVec, newCenterVec), -1.0f, 1.0f));
+					if (dot(cross(newCenterVec, oldCenterVec), e->a->pos - e->b->pos) < 0)
+						angle += std::numbers::pi_v<float>;
+					if (angle < smallestAngle) {
+						smallestAngle = angle;
+						pointWithSmallestAngle = p;
+						centerOfSmallest = c.value();
+						smallestNumber = i;
+					}
+					if (debug) ss << i << ".    " << p->pos << " center " << c.value() << " angle " << angle << " newCenterFaceDot " << newCenterFaceDot << "\n";
 				}
-				if (debug) ss << i << ".    " << p->pos << " center " << c.value() << " angle " << angle << " newCenterFaceDot " << newCenterFaceDot << "\n";
 			nextneighbor:;
 			}
 
@@ -387,7 +389,6 @@ namespace bpa {
 
 		if (debug) saveTriangles("seed.stl", triangles);
 
-		auto counter = 0;
 		while (auto e_ij = getActiveEdge(front)) {
 			if (debug) saveTriangles("current_active_edge.stl", std::vector<Triangle>{Triangle{e_ij.value()->a->pos, e_ij.value()->a->pos, e_ij.value()->b->pos}});
 			const auto o_k = ballPivot(e_ij.value(), grid, radius);
