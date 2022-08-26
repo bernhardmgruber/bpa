@@ -1,15 +1,12 @@
 #pragma once
 
 #include <array>
-#include <vector>
-
 #include <glm/glm.hpp>
+#include <vector>
 
 namespace bpa {
 	struct Triangle : std::array<glm::vec3, 3> {
-		auto normal() const {
-			return glm::normalize(glm::cross((*this)[0] - (*this)[1], (*this)[0] - (*this)[2]));
-		}
+		auto normal() const { return glm::normalize(glm::cross((*this)[0] - (*this)[1], (*this)[0] - (*this)[2])); }
 	};
 
 	struct Point {
@@ -18,4 +15,4 @@ namespace bpa {
 	};
 
 	auto reconstruct(const std::vector<Point>& points, float radius) -> std::vector<Triangle>;
-}
+} // namespace bpa

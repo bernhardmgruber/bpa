@@ -1,7 +1,7 @@
-#include <gtest/gtest.h>
-#include <glm/gtx/io.hpp>
-
 #include "../src/bpa.cpp"
+
+#include <glm/gtx/io.hpp>
+#include <gtest/gtest.h>
 
 using namespace bpa;
 
