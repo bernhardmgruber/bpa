@@ -1,17 +1,16 @@
 #include "bpa.h"
 
+#include "IO.h"
+
 #include <algorithm>
 #include <deque>
-#include <optional>
-#include <string>
-#include <iostream>
-#include <sstream>
-#include <numeric>
-#include <numbers>
-
 #include <glm/gtx/io.hpp>
-
-#include "IO.h"
+#include <iostream>
+#include <numbers>
+#include <numeric>
+#include <optional>
+#include <sstream>
+#include <string>
 
 using namespace glm;
 
@@ -28,11 +27,7 @@ namespace bpa {
 			std::vector<MeshEdge*> edges;
 		};
 
-		enum class EdgeStatus {
-			active,
-			inner,
-			boundary
-		};
+		enum class EdgeStatus { active, inner, boundary };
 
 		struct MeshEdge {
 			MeshPoint* a;
@@ -44,17 +39,14 @@ namespace bpa {
 			EdgeStatus status = EdgeStatus::active;
 		};
 
-		struct MeshFace : std::array<MeshPoint*, 3>{
-			auto normal() const {
-				return normalize(cross((*this)[0]->pos - (*this)[1]->pos, (*this)[0]->pos - (*this)[2]->pos));
-			}
+		struct MeshFace : std::array<MeshPoint*, 3> {
+			auto normal() const { return normalize(cross((*this)[0]->pos - (*this)[1]->pos, (*this)[0]->pos - (*this)[2]->pos)); }
 		};
 
 		using Cell = std::vector<MeshPoint>;
 
 		struct Grid {
-			Grid(const std::vector<Point>& points, float radius)
-				: cellSize(radius * 2) {
+			Grid(const std::vector<Point>& points, float radius) : cellSize(radius * 2) {
 				lower = points.front().pos;
 				upper = points.front().pos;
 
@@ -77,9 +69,7 @@ namespace bpa {
 				return clamp(index, ivec3{}, dims - 1);
 			}
 
-			auto cell(ivec3 index) -> Cell& {
-				return cells[index.z * dims.x * dims.y + index.y * dims.x + index.x];
-			}
+			auto cell(ivec3 index) -> Cell& { return cells[index.z * dims.x * dims.y + index.y * dims.x + index.x]; }
 
 			auto sphericalNeighborhood(vec3 point, std::initializer_list<vec3> ignore) -> std::vector<MeshPoint*> {
 				std::vector<MeshPoint*> result;
@@ -89,9 +79,12 @@ namespace bpa {
 					for (auto yOff : {-1, 0, 1}) {
 						for (auto zOff : {-1, 0, 1}) {
 							const auto index = centerIndex + ivec3{xOff, yOff, zOff};
-							if (index.x < 0 || index.x >= dims.x) continue;
-							if (index.y < 0 || index.y >= dims.y) continue;
-							if (index.z < 0 || index.z >= dims.z) continue;
+							if (index.x < 0 || index.x >= dims.x)
+								continue;
+							if (index.y < 0 || index.y >= dims.y)
+								continue;
+							if (index.z < 0 || index.z >= dims.z)
+								continue;
 							for (auto& p : cell(index))
 								if (length2(p.pos - point) < cellSize * cellSize && std::find(begin(ignore), end(ignore), p.pos) == end(ignore))
 									result.push_back(&p);
@@ -109,7 +102,8 @@ namespace bpa {
 		};
 
 		auto computeBallCenter(MeshFace f, float radius) -> std::optional<vec3> {
-			// from https://gamedev.stackexchange.com/questions/60630/how-do-i-find-the-circumcenter-of-a-triangle-in-3d
+			// from
+			// https://gamedev.stackexchange.com/questions/60630/how-do-i-find-the-circumcenter-of-a-triangle-in-3d
 			const vec3 ac = f[2]->pos - f[0]->pos;
 			const vec3 ab = f[1]->pos - f[0]->pos;
 			const vec3 abXac = cross(ab, ac);
@@ -136,20 +130,19 @@ namespace bpa {
 
 		auto findSeedTriangle(Grid& grid, float radius) -> std::optional<SeedResult> {
 			for (auto& cell : grid.cells) {
-				const auto avgNormal = normalize(std::accumulate(begin(cell), end(cell), vec3{}, [](vec3 acc, const MeshPoint& p) {
-					return acc + p.normal;
-				}));
+				const auto avgNormal = normalize(std::accumulate(begin(cell), end(cell), vec3{}, [](vec3 acc, const MeshPoint& p) { return acc + p.normal; }));
 				for (auto& p1 : cell) {
 					auto neighborhood = grid.sphericalNeighborhood(p1.pos, {p1.pos});
-					std::sort(begin(neighborhood), end(neighborhood), [&](MeshPoint* a, MeshPoint* b) {
-						return length(a->pos - p1.pos) < length(b->pos - p1.pos);
-					});
+					std::sort(
+						begin(neighborhood), end(neighborhood), [&](MeshPoint* a, MeshPoint* b) { return length(a->pos - p1.pos) < length(b->pos - p1.pos); });
 
 					for (auto& p2 : neighborhood) {
 						for (auto& p3 : neighborhood) {
-							if (p2 == p3) continue;
+							if (p2 == p3)
+								continue;
 							MeshFace f{{&p1, p2, p3}};
-							if (dot(f.normal(), avgNormal) < 0) // only accept triangles which's normal points into the same half-space as the average normal of this cell's points
+							if (dot(f.normal(), avgNormal) < 0) // only accept triangles which's normal points into the same
+							                                    // half-space as the average normal of this cell's points
 								continue;
 							const auto ballCenter = computeBallCenter(f, radius);
 							if (ballCenter && ballIsEmpty(ballCenter.value(), neighborhood, radius)) {
@@ -199,43 +192,52 @@ namespace bpa {
 			MeshPoint* pointWithSmallestAngle = nullptr;
 			vec3 centerOfSmallest{};
 			std::stringstream ss;
-			if (debug) ss << counter << ". pivoting edge a=" << e->a->pos << " b=" << e->b->pos << " op=" << e->opposite->pos << ". testing " << neighborhood.size() << " neighbors\n";
+			if (debug)
+				ss << counter << ". pivoting edge a=" << e->a->pos << " b=" << e->b->pos << " op=" << e->opposite->pos << ". testing " << neighborhood.size()
+				   << " neighbors\n";
 			auto i = 0;
 			int smallestNumber = 0;
 			for (const auto& p : neighborhood) {
 				i++;
 				auto newFaceNormal = Triangle{e->b->pos, e->a->pos, p->pos}.normal();
 
-				// this check is not in the paper: all points' normals must point into the same half-space
+				// this check is not in the paper: all points' normals must point into the
+				// same half-space
 				if (dot(newFaceNormal, p->normal) < 0)
 					continue;
 
 				const auto c = computeBallCenter(MeshFace{{e->b, e->a, p}}, radius);
 				if (!c) {
-					if (debug) ss << i << ".    " << p->pos << " center computation failed\n";
+					if (debug)
+						ss << i << ".    " << p->pos << " center computation failed\n";
 					continue;
 				}
 
 				if (debug) {
 					static auto counter2 = 0;
 					counter2++;
-					saveTriangles(std::to_string(counter) + "_" + std::to_string(counter2) + "_face.stl", std::vector<Triangle>{Triangle{e->a->pos, e->b->pos, p->pos}});
+					saveTriangles(
+						std::to_string(counter) + "_" + std::to_string(counter2) + "_face.stl", std::vector<Triangle>{Triangle{e->a->pos, e->b->pos, p->pos}});
 					savePoints(std::to_string(counter) + "_" + std::to_string(counter2) + "_ballcenter.ply", {c.value()});
 				}
 
-				// this check is not in the paper: the ball center must always be above the triangle
+				// this check is not in the paper: the ball center must always be above the
+				// triangle
 				const auto newCenterVec = normalize(c.value() - m);
 				const auto newCenterFaceDot = dot(newCenterVec, newFaceNormal);
 				if (newCenterFaceDot < 0) {
-					if (debug) ss << i << ".    " << p->pos << " ball center " << c.value() << " underneath triangle\n";
+					if (debug)
+						ss << i << ".    " << p->pos << " ball center " << c.value() << " underneath triangle\n";
 					continue;
 				}
 
-				// this check is not in the paper: points to which we already have an inner edge are not considered
+				// this check is not in the paper: points to which we already have an inner
+				// edge are not considered
 				for (const auto* ee : p->edges) {
 					const auto* otherPoint = ee->a == p ? ee->b : ee->a;
 					if (ee->status == EdgeStatus::inner && (otherPoint == e->a || otherPoint == e->b)) {
-						if (debug) ss << i << ".    " << p->pos << " inner edge exists\n";
+						if (debug)
+							ss << i << ".    " << p->pos << " inner edge exists\n";
 						goto nextneighbor;
 					}
 				}
@@ -250,7 +252,8 @@ namespace bpa {
 						centerOfSmallest = c.value();
 						smallestNumber = i;
 					}
-					if (debug) ss << i << ".    " << p->pos << " center " << c.value() << " angle " << angle << " newCenterFaceDot " << newCenterFaceDot << "\n";
+					if (debug)
+						ss << i << ".    " << p->pos << " center " << c.value() << " angle " << angle << " newCenterFaceDot " << newCenterFaceDot << "\n";
 				}
 			nextneighbor:;
 			}
@@ -262,34 +265,31 @@ namespace bpa {
 						savePoints(std::to_string(counter) + "_candidate.ply", {pointWithSmallestAngle->pos});
 					}
 					return PivotResult{pointWithSmallestAngle, centerOfSmallest};
-				} else if(debug)
+				} else if (debug)
 					ss << "        found candidate " << smallestNumber << " but ball is not empty\n";
 			}
-			if (debug) std::cout << ss.str();
+			if (debug)
+				std::cout << ss.str();
 
 			return {};
 		}
 
-		auto notUsed(const MeshPoint* p) -> bool {
-			return !p->used;
-		}
+		auto notUsed(const MeshPoint* p) -> bool { return !p->used; }
 
 		auto onFront(const MeshPoint* p) -> bool {
-			return std::any_of(begin(p->edges), end(p->edges), [&](const MeshEdge* e) {
-				return e->status == EdgeStatus::active;
-			});
+			return std::any_of(begin(p->edges), end(p->edges), [&](const MeshEdge* e) { return e->status == EdgeStatus::active; });
 		}
 
 		void remove(MeshEdge* edge) {
-			// just mark the edge as inner. The edge will be removed later in getActiveEdge()
+			// just mark the edge as inner. The edge will be removed later in
+			// getActiveEdge()
 			edge->status = EdgeStatus::inner;
 		}
 
-		void outputTriangle(MeshFace f, std::vector<Triangle>& triangles) {
-			triangles.push_back({f[0]->pos, f[1]->pos, f[2]->pos});
-		}
+		void outputTriangle(MeshFace f, std::vector<Triangle>& triangles) { triangles.push_back({f[0]->pos, f[1]->pos, f[2]->pos}); }
 
-		auto join(MeshEdge* e_ij, MeshPoint* o_k, vec3 o_k_ballCenter, std::vector<MeshEdge*>& front, std::deque<MeshEdge>& edges) -> std::tuple<MeshEdge*, MeshEdge*> {
+		auto join(MeshEdge* e_ij, MeshPoint* o_k, vec3 o_k_ballCenter, std::vector<MeshEdge*>& front, std::deque<MeshEdge>& edges)
+			-> std::tuple<MeshEdge*, MeshEdge*> {
 			auto& e_ik = edges.emplace_back(MeshEdge{e_ij->a, o_k, e_ij->b, o_k_ballCenter});
 			auto& e_kj = edges.emplace_back(MeshEdge{o_k, e_ij->b, e_ij->a, o_k_ballCenter});
 
@@ -360,7 +360,7 @@ namespace bpa {
 					return e;
 			return nullptr;
 		}
-	}
+	} // namespace
 
 	auto reconstruct(const std::vector<Point>& points, float radius) -> std::vector<Triangle> {
 		Grid grid(points, radius);
@@ -382,24 +382,30 @@ namespace bpa {
 		e0.prev = e1.next = &e2;
 		e0.next = e2.prev = &e1;
 		e1.prev = e2.next = &e0;
-		seed[0]->edges = { &e0, &e2 };
-		seed[1]->edges = { &e0, &e1 };
-		seed[2]->edges = { &e1, &e2 };
+		seed[0]->edges = {&e0, &e2};
+		seed[1]->edges = {&e0, &e1};
+		seed[2]->edges = {&e1, &e2};
 		std::vector<MeshEdge*> front{&e0, &e1, &e2};
 
-		if (debug) saveTriangles("seed.stl", triangles);
+		if (debug)
+			saveTriangles("seed.stl", triangles);
 
 		while (auto e_ij = getActiveEdge(front)) {
-			if (debug) saveTriangles("current_active_edge.stl", std::vector<Triangle>{Triangle{e_ij.value()->a->pos, e_ij.value()->a->pos, e_ij.value()->b->pos}});
+			if (debug)
+				saveTriangles("current_active_edge.stl", std::vector<Triangle>{Triangle{e_ij.value()->a->pos, e_ij.value()->a->pos, e_ij.value()->b->pos}});
 			const auto o_k = ballPivot(e_ij.value(), grid, radius);
-			if (debug) saveTriangles("current_mesh.stl", triangles);
+			if (debug)
+				saveTriangles("current_mesh.stl", triangles);
 			if (o_k && (notUsed(o_k->p) || onFront(o_k->p))) {
 				outputTriangle({{e_ij.value()->a, o_k->p, e_ij.value()->b}}, triangles);
 				auto [e_ik, e_kj] = join(e_ij.value(), o_k->p, o_k->center, front, edges);
-				if (auto* e_ki = findReverseEdgeOnFront(e_ik)) glue(e_ik, e_ki, front);
-				if (auto* e_jk = findReverseEdgeOnFront(e_kj)) glue(e_kj, e_jk, front);
+				if (auto* e_ki = findReverseEdgeOnFront(e_ik))
+					glue(e_ik, e_ki, front);
+				if (auto* e_jk = findReverseEdgeOnFront(e_kj))
+					glue(e_kj, e_jk, front);
 			} else {
-				if (debug) savePoints("current_boundary_point.ply", {o_k->p->pos});
+				if (debug)
+					savePoints("current_boundary_point.ply", {o_k->p->pos});
 				e_ij.value()->status = EdgeStatus::boundary;
 			}
 		}
@@ -415,4 +421,4 @@ namespace bpa {
 
 		return triangles;
 	}
-}
+} // namespace bpa

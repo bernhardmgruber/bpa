@@ -1,12 +1,11 @@
-#include <gtest/gtest.h>
-#include <glm/glm.hpp>
+#include "../src/IO.h"
+#include "../src/bpa.h"
 
 #include <chrono>
+#include <glm/glm.hpp>
+#include <gtest/gtest.h>
 #include <iostream>
 #include <numbers>
-
-#include "../src/bpa.h"
-#include "../src/IO.h"
 
 using namespace bpa;
 
@@ -39,7 +38,7 @@ namespace {
 		std::cerr << "[          ] Point: " << points.size() << " Triangles: " << result.size() << " T/s: " << result.size() / seconds << '\n';
 		return result;
 	}
-}
+} // namespace
 
 TEST(reconstruct, sphere_36_18) {
 	const auto cloud = createSphericalCloud(36, 18);
@@ -63,12 +62,8 @@ TEST(reconstruct, sphere_200_100) {
 }
 
 TEST(reconstruct, tetrahedron) {
-	const auto cloud = std::vector<Point>{
-		{{0, 0, 0}, glm::normalize(glm::vec3{-1, -1, -1})},
-		{{0, 1, 0}, glm::normalize(glm::vec3{0, 1, 0})},
-		{{1, 0, 0}, glm::normalize(glm::vec3{1, 0, 0})},
-		{{0, 0, 1}, glm::normalize(glm::vec3{0, 0, 1})}
-	};
+	const auto cloud = std::vector<Point>{{{0, 0, 0}, glm::normalize(glm::vec3{-1, -1, -1})}, {{0, 1, 0}, glm::normalize(glm::vec3{0, 1, 0})},
+		{{1, 0, 0}, glm::normalize(glm::vec3{1, 0, 0})}, {{0, 0, 1}, glm::normalize(glm::vec3{0, 0, 1})}};
 	savePoints("tetrahedron_cloud.ply", cloud);
 	const auto mesh = measuredReconstruct(cloud, 2);
 	saveTriangles("tetrahedron_mesh.stl", mesh);

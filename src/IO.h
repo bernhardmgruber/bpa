@@ -1,9 +1,9 @@
 #pragma once
 
+#include "bpa.h"
+
 #include <filesystem>
 #include <fstream>
-
-#include "bpa.h"
 
 inline void saveTriangles(std::filesystem::path path, const std::vector<bpa::Triangle>& triangles) {
 	if (path.has_parent_path())
