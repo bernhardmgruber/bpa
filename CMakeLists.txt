@@ -36,21 +36,3 @@ target_link_libraries(tests PRIVATE
 	GTest::GTest GTest::Main
 	glm
 )
-
-# clang-format
-find_program(CLANG_FORMAT NAMES "clang-format")
-if(NOT CLANG_FORMAT)
-	message("clang-format not found")
-else()
-	message("clang-format found: ${CLANG_FORMAT}")
-	add_custom_target(clang-format COMMAND ${CLANG_FORMAT} -style=file -i ${source_files})
-endif()
-
-# clang-tidy
-find_program(CLANG_TIDY NAMES "clang-tidy")
-if(NOT CLANG_TIDY)
-	message("clang-tidy not found")
-else()
-	message("clang-tidy found: ${CLANG_TIDY}")
-	set_target_properties(${PROJECT_NAME} PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY}")
-endif()
