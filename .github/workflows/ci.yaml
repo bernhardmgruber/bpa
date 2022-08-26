@@ -1,0 +1,72 @@
+name: CI
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  CONFIG: RelWithDebInfo
+  VCPKG_PACKAGES: "glm gtest"
+
+jobs:
+  clang-format:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v2
+    - uses: DoozyX/clang-format-lint-action@v0.13
+      with:
+        exclude: './thirdparty'
+        extensions: 'cpp,hpp,h,cu'
+        clangFormatVersion: 13
+
+  ci:
+    runs-on: ${{ matrix.os || 'ubuntu-22.04' }}
+    env: ${{ matrix.env }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - env:
+              CXX: g++-12
+            install_extra: g++-12
+          - env:
+              CXX: clang++-14
+            install_extra: clang-14
+          - env:
+              VCPKG_DEFAULT_TRIPLET: x64-windows
+            os: windows-2022
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: install extras
+        if: ${{ matrix.install_extra }}
+        run: |
+          sudo apt install ${{ matrix.install_extra }}
+      - name: vcpkg install dependencies
+        run: |
+          vcpkg install $VCPKG_PACKAGES
+      - name: cmake
+        run: |
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=$CONFIG -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake
+      - name: build tests + examples
+        run: |
+          cmake --build build --config $CONFIG
+      - name: run tests
+        run: |
+          cd build
+          if [ -d $CONFIG ]
+          then
+            ./$CONFIG/tests
+          else
+            ./tests
+          fi
