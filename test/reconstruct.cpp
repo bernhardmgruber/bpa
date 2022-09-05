@@ -1,6 +1,5 @@
-#include "../src/IO.h"
-#include "../src/bpa.h"
-
+#include <IO.h>
+#include <bpa.h>
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <glm/glm.hpp>
