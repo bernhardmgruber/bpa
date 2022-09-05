@@ -11,9 +11,9 @@ The model of the bunny is provided by the [Stanford University Computer Graphics
 
 ## Building
 
-1. Please install the following dependencies using your favourit dependency manager (I tried vcpkg):
+1. Please install the following dependencies using your favourite dependency manager (I tried vcpkg):
     - glm
-    - gtest
+    - Catch2v3
 
 2. Generate build system using CMake
 ```
@@ -23,4 +23,5 @@ cd bpa/build
 cmake ..
 ```
 
-3. Run `make` on Linux or open and build Visual Studio solution on Windows. Requires a compiler supporting C\++20, but can probably easily ported down to C\++17 or C\++14.
+3. Run `make` on Linux or open and build Visual Studio solution on Windows.
+   Requires a compiler supporting C\++20, but can probably be easily ported down to C\++17 or C\++14.

@@ -11,7 +11,7 @@ concurrency:
 
 env:
   CONFIG: RelWithDebInfo
-  VCPKG_PACKAGES: "glm gtest"
+  VCPKG_PACKAGES: "glm catch2"
 
 jobs:
   clang-format:
