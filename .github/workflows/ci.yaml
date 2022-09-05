@@ -58,7 +58,7 @@ jobs:
           mkdir build
           cd build
           cmake .. -DCMAKE_BUILD_TYPE=$CONFIG -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake
-      - name: build tests + examples
+      - name: build tests + driver
         run: |
           cmake --build build --config $CONFIG
       - name: run tests
@@ -69,4 +69,13 @@ jobs:
             ./$CONFIG/tests
           else
             ./tests
+          fi
+      - name: run driver
+        run: |
+          cd build
+          if [ -d $CONFIG ]
+          then
+            ./$CONFIG/bpa ../test/data/bunny.xyz 0.002
+          else
+            ./bpa ../test/data/bunny.xyz 0.002
           fi

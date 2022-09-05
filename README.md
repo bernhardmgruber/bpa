@@ -25,3 +25,7 @@ cmake ..
 
 3. Run `make` on Linux or open and build Visual Studio solution on Windows.
    Requires a compiler supporting C\++20, but can probably be easily ported down to C\++17 or C\++14.
+
+4. (Optional) Run the tests by executing the `tests` executable in the `build` directory
+
+5. Play with the algorithm using the command line executable `bpa <inputPointCloudFile> <radius> [<outputMeshFile>]` in the `build` directory
